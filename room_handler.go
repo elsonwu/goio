@@ -2,6 +2,10 @@ package goreal
 
 type ClientRoomHandler map[string]*ClientRoom
 
+func (self *ClientRoomHandler) deleteRoom(id string) {
+	delete(*self, id)
+}
+
 func (self *ClientRoomHandler) newRoom(id string) *ClientRoom {
 	cr := &ClientRoom{
 		Id:      id,
@@ -14,6 +18,10 @@ func (self *ClientRoomHandler) newRoom(id string) *ClientRoom {
 		for _, clt := range cr.Clients {
 			go clt.Receive(message)
 		}
+	})
+
+	cr.On("destory", func(message *Message) {
+		self.deleteRoom(cr.Id)
 	})
 
 	return cr

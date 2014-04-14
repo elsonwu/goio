@@ -26,10 +26,7 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)
-			fmt.Printf("clients: %#v\n", ch)
-			for _, r := range crh {
-				fmt.Printf("id: %s, clients: %#v\n", r.Id, r.Clients)
-			}
+			log.Printf("# count room: %d, clients: %d # \n", len(crh), len(ch))
 		}
 	}()
 
@@ -40,69 +37,70 @@ func main() {
 	m := &martini.ClassicMartini{mart, router}
 	m.Use(martini.Recovery())
 	m.Use(func(res http.ResponseWriter) {
-		res.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 		res.Header().Set("Content-Type", "application/json")
+		res.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		res.Header().Set("Access-Control-Allow-Credentials", "true")
+		res.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1")
 	})
 
-	m.Get("/new_client", func(req *http.Request) (int, string) {
+	m.Get("/client", func(req *http.Request) (int, string) {
 		id := uuid()
-		client := ch.Add(id)
-		client.Emit("connect", &goreal.Message{
+		clt := ch.Add(id)
+		clt.Emit("broadcast", &goreal.Message{
 			EventName: "connect",
 			Data:      id,
 		})
 
-		client.On("broadcast", func(message *goreal.Message) {
-			fmt.Println("id:"+id+" received message ", *message)
+		clt.On("destory", func(message *goreal.Message) {
+			clt.Emit("broadcast", &goreal.Message{
+				EventName: "disconnect",
+				Data:      message.Data,
+			})
+		})
+
+		clt.On("join", func(message *goreal.Message) {
+			if roomId, ok := message.Data.(string); ok {
+				room := crh.Room(roomId)
+				if !room.Has(clt.Id) {
+					room.Emit("broadcast", &goreal.Message{
+						EventName: "joined",
+						Data:      clt.Id,
+					})
+					room.Add(clt)
+				}
+			}
+		})
+
+		clt.On("leave", func(message *goreal.Message) {
+			if roomId, ok := message.Data.(string); ok {
+				room := crh.Room(roomId)
+				if room.Has(clt.Id) {
+					room.Emit("broadcast", &goreal.Message{
+						EventName: "left",
+						Data:      clt.Id,
+					})
+					room.Delete(clt.Id)
+				}
+			}
 		})
 
 		return 200, id
-	})
-
-	m.Get("/join/:id", func(params martini.Params, req *http.Request) (int, string) {
-		id := params["id"]
-		clt := ch.Client(id)
-		if clt == nil {
-			return 403, fmt.Sprintf("client %s does not exist\n", id)
-		}
-
-		clt.UpdateActiveTime()
-		roomId := req.URL.Query().Get("room_id")
-		if roomId == "" {
-			return 403, fmt.Sprintf("room_id is missing\n")
-		}
-
-		go func() {
-			roomId := req.URL.Query().Get("room_id")
-			room := crh.Room(roomId)
-			if !room.Has(clt.Id) {
-				room.Emit("broadcast", &goreal.Message{
-					EventName: "joined",
-					Data:      clt.Id,
-				})
-				room.Add(clt)
-			}
-		}()
-
-		return 200, "ok"
 	})
 
 	m.Get("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
 		id := params["id"]
 		clt := ch.Client(id)
 		if clt == nil {
-			return 401, fmt.Sprintf("To client %s does not exist\n", id)
+			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
 
 		clt.UpdateActiveTime()
 		select {
 		case msg := <-clt.Msg:
-			fmt.Println("msg:", msg)
 			js, _ := json.Marshal(msg)
 			return 200, string(js)
 		case <-time.After(10 * time.Second):
-			fmt.Println("no msg...")
-			return 200, "1"
+			// do nothing
 		}
 
 		return 200, "1"
@@ -112,19 +110,21 @@ func main() {
 		id := params["id"]
 		clt := ch.Client(id)
 		if clt == nil {
-			return 401, fmt.Sprintf("To client %s does not exist\n", id)
+			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
 
 		clt.UpdateActiveTime()
-		go func() {
-			message := &goreal.Message{}
-			err := json.NewDecoder(req.Body).Decode(message)
-			if err != nil {
-				return
-			}
+		message := &goreal.Message{}
+		defer req.Body.Close()
+		err := json.NewDecoder(req.Body).Decode(message)
+		if err != nil {
+			return 200, "message format is invalid"
+		}
 
-			clt.Emit("broadcast", message)
-		}()
+		go func(message *goreal.Message) {
+			log.Println("post message: ", *message)
+			clt.Emit(message.EventName, message)
+		}(message)
 
 		return 200, "1"
 	})

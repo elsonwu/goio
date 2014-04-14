@@ -1,7 +1,7 @@
 package goreal
 
 import (
-	"fmt"
+	"log"
 	"time"
 )
 
@@ -40,9 +40,8 @@ func (self *ClientHandler) Add(id string) *Client {
 			}
 
 			time.Sleep(3 * time.Second)
-			fmt.Println("id:", clt.Id, " last:", clt.LastHandshake, " t:", time.Now().Unix()-clt.LastHandshake)
-			if 30 < time.Now().Unix()-clt.LastHandshake {
-				fmt.Println("client id:", clt.Id, " destory")
+			if 60 < time.Now().Unix()-clt.LastHandshake {
+				log.Printf("client id: %s destory \n", clt.Id)
 				clt.Destory()
 			}
 		}

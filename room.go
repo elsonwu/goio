@@ -13,13 +13,32 @@ func (self *ClientRoom) Has(id string) bool {
 	return ok
 }
 
+func (self *ClientRoom) Delete(id string) {
+	delete(self.Clients, id)
+	if 0 == len(self.Clients) {
+		self.Destory()
+	}
+
+	self.Emit("broadcast", &Message{
+		EventName: "left",
+		Data:      id,
+	})
+}
+
+func (self *ClientRoom) Destory() {
+	self.Emit("destory", &Message{
+		EventName: "destory",
+		Data:      self.Id,
+	})
+}
+
 func (self *ClientRoom) Add(clt *Client) {
 	if self.Has(clt.Id) {
 		return
 	}
 
 	clt.On("destory", func(message *Message) {
-		delete(self.Clients, clt.Id)
+		self.Delete(clt.Id)
 	})
 
 	self.Clients[clt.Id] = clt
