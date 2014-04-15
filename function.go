@@ -1,8 +1,9 @@
 package goreal
 
 import (
+	"github.com/elsonwu/random"
 	"log"
-	"strconv"
+	"sync"
 	"time"
 )
 
@@ -12,7 +13,7 @@ var globalUsers *Users
 
 func GlobalClients() *Clients {
 	if globalClients == nil {
-		globalClients = &Clients{}
+		globalClients = NewClients()
 	}
 
 	return globalClients
@@ -20,7 +21,7 @@ func GlobalClients() *Clients {
 
 func GlobalRooms() *Rooms {
 	if globalRooms == nil {
-		globalRooms = &Rooms{}
+		globalRooms = NewRooms()
 	}
 
 	return globalRooms
@@ -28,7 +29,7 @@ func GlobalRooms() *Rooms {
 
 func GlobalUsers() *Users {
 	if globalUsers == nil {
-		globalUsers = &Users{}
+		globalUsers = NewUsers()
 	}
 
 	return globalUsers
@@ -37,36 +38,41 @@ func GlobalUsers() *Users {
 func NewUser(id string) *User {
 	return &User{
 		Id:      id,
-		Clients: make(map[string]*Client),
-		Rooms:   make(Rooms),
+		Clients: NewClients(),
+		Rooms:   NewRooms(),
 	}
 }
 
-func NewRoom(id string) *Room {
-
-	if GlobalRooms().Has(id) {
-		return GlobalRooms().Get(id)
-	}
-
-	room := &Room{
+func newRoom(id string) *Room {
+	return &Room{
 		Id:    id,
-		Users: make(Users),
+		Users: NewUsers(),
 	}
-
-	GlobalRooms().Add(room)
-	return room
 }
 
-func NewRooms() Rooms {
-	return make(Rooms)
+func NewUsers() *Users {
+	return &Users{
+		us:   make(us),
+		lock: new(sync.RWMutex),
+	}
 }
 
-func NewClients() Clients {
-	return make(Clients)
+func NewClients() *Clients {
+	return &Clients{
+		cs:   make(cs),
+		lock: new(sync.RWMutex),
+	}
+}
+
+func NewRooms() *Rooms {
+	return &Rooms{
+		rs:   make(rs),
+		lock: new(sync.RWMutex),
+	}
 }
 
 func Uuid() string {
-	return strconv.Itoa(int(time.Now().Nanosecond()))
+	return random.String(20)
 }
 
 func NewClient() *Client {
@@ -84,8 +90,9 @@ func NewClient() *Client {
 			}
 
 			time.Sleep(3 * time.Second)
-			if 60 < time.Now().Unix()-clt.LastHandshake {
-				log.Printf("Client id: %s destory \n", clt.Id)
+			log.Printf("client id:%s, t:%d\n", clt.Id, time.Now().Unix()-clt.LastHandshake)
+			if 30 < time.Now().Unix()-clt.LastHandshake {
+				log.Printf("Client id:%s destory \n", clt.Id)
 				clt.Destory()
 			}
 		}

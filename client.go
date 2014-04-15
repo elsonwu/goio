@@ -19,7 +19,7 @@ func (self *Client) Receive(message *Message) {
 func (self *Client) Destory() {
 	self.Emit("destory", &Message{
 		EventName: "destory",
-		Data:      self,
+		Data:      self.Id,
 	})
 }
 

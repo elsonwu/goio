@@ -1,13 +1,18 @@
 package goreal
 
 import (
-	"log"
+	"sync"
 )
 
-type Clients map[string]*Client
+type cs map[string]*Client
+
+type Clients struct {
+	cs   cs
+	lock *sync.RWMutex
+}
 
 func (self *Clients) Get(id string) *Client {
-	if clt, ok := (*self)[id]; ok {
+	if clt, ok := self.cs[id]; ok {
 		return clt
 	}
 
@@ -15,12 +20,11 @@ func (self *Clients) Get(id string) *Client {
 }
 
 func (self *Clients) Count() int {
-	return len(*self)
+	return len(self.cs)
 }
 
 func (self *Clients) Receive(message *Message) {
-	for _, clt := range *self {
-		log.Println("client id:", clt.Id)
+	for _, clt := range self.cs {
 		go func(clt *Client, msg *Message) {
 			clt.Msg <- msg
 		}(clt, message)
@@ -28,15 +32,20 @@ func (self *Clients) Receive(message *Message) {
 }
 
 func (self *Clients) Delete(id string) {
-	delete(*self, id)
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	delete(self.cs, id)
 }
 
 func (self *Clients) Add(clt *Client) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	if nil != self.Get(clt.Id) {
 		return
 	}
 
-	(*self)[clt.Id] = clt
+	self.cs[clt.Id] = clt
 	clt.On("destory", func(message *Message) {
 		self.Delete(clt.Id)
 	})

@@ -1,8 +1,24 @@
 package goreal
 
-type Users map[string]*User
+import (
+	"sync"
+)
+
+type us map[string]*User
+
+type Users struct {
+	us   us
+	lock *sync.RWMutex
+}
+
+func (self *Users) Count() int {
+	return len(self.us)
+}
 
 func (self *Users) Add(user *User) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	if nil != self.Get(user.Id) {
 		return
 	}
@@ -11,15 +27,18 @@ func (self *Users) Add(user *User) {
 		self.Delete(user.Id)
 	})
 
-	(*self)[user.Id] = user
+	self.us[user.Id] = user
 }
 
 func (self *Users) Delete(userId string) {
-	delete(*self, userId)
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	delete(self.us, userId)
 }
 
 func (self *Users) Get(userId string) *User {
-	if user, ok := (*self)[userId]; ok {
+	if user, ok := self.us[userId]; ok {
 		return user
 	}
 

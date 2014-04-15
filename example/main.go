@@ -21,9 +21,8 @@ func main() {
 
 	go func() {
 		for {
-			time.Sleep(5 * time.Second)
-			log.Printf("\nrooms: %#v \nusers: %#v \nclients: %#v \n", *rooms, *users, *clients)
-			fmt.Printf("rooms: %d, users: %d, clients: %d \n\n", len(*rooms), len(*users), len(*clients))
+			time.Sleep(3 * time.Second)
+			fmt.Printf("rooms: %d, users: %d, clients: %d \n\n", rooms.Count(), users.Count(), clients.Count())
 		}
 	}()
 
@@ -58,7 +57,7 @@ func main() {
 		user.Add(clt)
 		clients.Add(clt)
 
-		clt.On("join", func(message *goreal.Message) {
+		clt.User.On("join", func(message *goreal.Message) {
 			if roomId, ok := message.Data.(string); ok {
 				room := rooms.Get(roomId)
 				if !room.Has(clt.User.Id) {
@@ -79,22 +78,26 @@ func main() {
 			}
 		})
 
-		clt.On("broadcast", func(message *goreal.Message) {
-			for _, room := range clt.User.Rooms {
-				room.Emit("broadcast", message)
+		clt.User.On("leave", func(message *goreal.Message) {
+			if roomId, ok := message.Data.(string); ok {
+				room := rooms.Get(roomId)
+				if room.Has(clt.User.Id) {
+					room.Emit("broadcast", &goreal.Message{
+						EventName: "leave",
+						Data:      clt.User.Id,
+					})
+					room.Delete(clt.User.Id)
+				}
 			}
 		})
 
-		clt.On("leave", func(message *goreal.Message) {
-			if roomId, ok := message.Data.(string); ok {
-				room := rooms.Get(roomId)
-				if room.Has(clt.Id) {
-					room.Emit("broadcast", &goreal.Message{
-						EventName: "left",
-						Data:      clt.Id,
-					})
-					room.Delete(clt.Id)
+		clt.User.On("broadcast", func(message *goreal.Message) {
+			if message.RoomId == "" {
+				for _, room := range clt.User.GetRooms() {
+					room.Emit("broadcast", message)
 				}
+			} else {
+				rooms.Get(message.RoomId).Emit("broadcast", message)
 			}
 		})
 
@@ -121,6 +124,7 @@ func main() {
 			// do nothing
 		}
 
+		clt.UpdateActiveTime()
 		return 200, "1"
 	})
 
@@ -150,9 +154,10 @@ func main() {
 				})
 			}
 
-			clt.Emit(message.EventName, message)
+			clt.User.Emit(message.EventName, message)
 		}(message)
 
+		clt.UpdateActiveTime()
 		return 200, "1"
 	})
 

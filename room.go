@@ -3,17 +3,22 @@ package goreal
 type Room struct {
 	Event
 	Id    string
-	Users Users
+	Users *Users
 }
 
 func (self *Room) Has(id string) bool {
-	_, ok := self.Users[id]
-	return ok
+	return nil != self.Users.Get(id)
+}
+
+func (self *Room) Receive(message *Message) {
+	for _, user := range self.Users.us {
+		go user.Receive(message)
+	}
 }
 
 func (self *Room) Delete(id string) {
-	delete(self.Users, id)
-	if 0 == len(self.Users) {
+	delete(self.Users.us, id)
+	if 0 == len(self.Users.us) {
 		self.Destory()
 	}
 

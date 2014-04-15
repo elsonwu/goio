@@ -3,12 +3,16 @@ package goreal
 type User struct {
 	Event
 	Id      string
-	Clients Clients
-	Rooms   Rooms
+	Clients *Clients
+	Rooms   *Rooms
 }
 
 func (self *User) Receive(message *Message) {
 	self.Clients.Receive(message)
+}
+
+func (self *User) GetRooms() rs {
+	return self.Rooms.rs
 }
 
 func (self *User) Has(id string) bool {
@@ -36,6 +40,7 @@ func (self *User) Add(clt *Client) {
 
 	clt.User = self
 	clt.On("destory", func(message *Message) {
+		clt.User.Clients.Delete(clt.Id)
 		if 0 == clt.User.Clients.Count() {
 			clt.User.Destory()
 		}
