@@ -8,25 +8,22 @@ import (
 	"log"
 	"net/http"
 	"runtime"
-	"strconv"
 	"time"
 )
-
-func uuid() string {
-	return strconv.Itoa(int(time.Now().Nanosecond()))
-}
 
 func main() {
 	host := "127.0.0.1:8888"
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	ch := goreal.NewClientHandler()
-	crh := goreal.NewClientRoomHandler()
+	clients := goreal.GlobalClients()
+	rooms := goreal.GlobalRooms()
+	users := goreal.GlobalUsers()
 
 	go func() {
 		for {
-			time.Sleep(10 * time.Second)
-			log.Printf("# count room: %d, clients: %d # \n", len(crh), len(ch))
+			time.Sleep(5 * time.Second)
+			log.Printf("\nrooms: %#v \nusers: %#v \nclients: %#v \n", *rooms, *users, *clients)
+			fmt.Printf("rooms: %d, users: %d, clients: %d \n\n", len(*rooms), len(*users), len(*clients))
 		}
 	}()
 
@@ -39,41 +36,58 @@ func main() {
 	m.Use(func(res http.ResponseWriter) {
 		res.Header().Set("Content-Type", "application/json")
 		res.Header().Set("Access-Control-Allow-Methods", "GET, POST")
-		res.Header().Set("Access-Control-Allow-Credentials", "true")
-		res.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1")
+		// res.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1")
 	})
 
-	m.Get("/client", func(req *http.Request) (int, string) {
-		id := uuid()
-		clt := ch.Add(id)
-		clt.Emit("broadcast", &goreal.Message{
-			EventName: "connect",
-			Data:      id,
-		})
+	m.Get("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
+		userId := params["user_id"]
+		user := users.Get(userId)
+		if user == nil {
+			user = goreal.NewUser(userId)
+			users.Add(user)
+		}
 
-		clt.On("destory", func(message *goreal.Message) {
-			clt.Emit("broadcast", &goreal.Message{
-				EventName: "disconnect",
-				Data:      message.Data,
+		clt := goreal.NewClient()
+		if 0 == user.Clients.Count() {
+			user.Emit("broadcast", &goreal.Message{
+				EventName: "connect",
+				CallerId:  user.Id,
 			})
-		})
+		}
+
+		user.Add(clt)
+		clients.Add(clt)
 
 		clt.On("join", func(message *goreal.Message) {
 			if roomId, ok := message.Data.(string); ok {
-				room := crh.Room(roomId)
-				if !room.Has(clt.Id) {
+				room := rooms.Get(roomId)
+				if !room.Has(clt.User.Id) {
 					room.Emit("broadcast", &goreal.Message{
-						EventName: "joined",
-						Data:      clt.Id,
+						EventName: "join",
+						Data:      clt.User.Id,
 					})
-					room.Add(clt)
+
+					clt.User.On("destory", func(message *goreal.Message) {
+						room.Emit("broadcast", &goreal.Message{
+							EventName: "leave",
+							Data:      clt.User.Id,
+						})
+					})
+
+					room.Add(clt.User)
 				}
+			}
+		})
+
+		clt.On("broadcast", func(message *goreal.Message) {
+			for _, room := range clt.User.Rooms {
+				room.Emit("broadcast", message)
 			}
 		})
 
 		clt.On("leave", func(message *goreal.Message) {
 			if roomId, ok := message.Data.(string); ok {
-				room := crh.Room(roomId)
+				room := rooms.Get(roomId)
 				if room.Has(clt.Id) {
 					room.Emit("broadcast", &goreal.Message{
 						EventName: "left",
@@ -84,12 +98,16 @@ func main() {
 			}
 		})
 
-		return 200, id
+		js, _ := json.Marshal(goreal.Message{
+			Data:     clt.Id,
+			CallerId: userId,
+		})
+		return 200, string(js)
 	})
 
 	m.Get("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
 		id := params["id"]
-		clt := ch.Client(id)
+		clt := clients.Get(id)
 		if clt == nil {
 			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
@@ -108,7 +126,7 @@ func main() {
 
 	m.Post("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
 		id := params["id"]
-		clt := ch.Client(id)
+		clt := clients.Get(id)
 		if clt == nil {
 			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
@@ -123,6 +141,15 @@ func main() {
 
 		go func(message *goreal.Message) {
 			log.Println("post message: ", *message)
+			if message.RoomId == "" && (message.EventName == "leave" || message.EventName == "leave") {
+				clt.Receive(&goreal.Message{
+					EventName: "error",
+					Data: map[string]string{
+						"error": "room id is missing",
+					},
+				})
+			}
+
 			clt.Emit(message.EventName, message)
 		}(message)
 

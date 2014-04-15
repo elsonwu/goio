@@ -7,6 +7,7 @@ import (
 type Client struct {
 	Event
 	Id            string
+	User          *User
 	Msg           chan *Message
 	LastHandshake int64
 }

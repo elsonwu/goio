@@ -1,45 +1,45 @@
 package goreal
 
-import ()
-
-type ClientRoom struct {
+type Room struct {
 	Event
-	Id      string
-	Clients map[string]*Client
+	Id    string
+	Users Users
 }
 
-func (self *ClientRoom) Has(id string) bool {
-	_, ok := self.Clients[id]
+func (self *Room) Has(id string) bool {
+	_, ok := self.Users[id]
 	return ok
 }
 
-func (self *ClientRoom) Delete(id string) {
-	delete(self.Clients, id)
-	if 0 == len(self.Clients) {
+func (self *Room) Delete(id string) {
+	delete(self.Users, id)
+	if 0 == len(self.Users) {
 		self.Destory()
 	}
 
 	self.Emit("broadcast", &Message{
-		EventName: "left",
-		Data:      id,
+		EventName: "leave",
+		CallerId:  id,
 	})
 }
 
-func (self *ClientRoom) Destory() {
+func (self *Room) Destory() {
 	self.Emit("destory", &Message{
 		EventName: "destory",
-		Data:      self.Id,
+		RoomId:    self.Id,
+		CallerId:  self.Id,
 	})
 }
 
-func (self *ClientRoom) Add(clt *Client) {
-	if self.Has(clt.Id) {
+func (self *Room) Add(user *User) {
+	if self.Has(user.Id) {
 		return
 	}
 
-	clt.On("destory", func(message *Message) {
-		self.Delete(clt.Id)
+	user.Rooms.Add(self)
+	user.On("destory", func(message *Message) {
+		self.Delete(user.Id)
 	})
 
-	self.Clients[clt.Id] = clt
+	self.Users.Add(user)
 }
