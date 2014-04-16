@@ -71,21 +71,22 @@ func NewClient() (clt *Client, done chan bool) {
 		Id:            Uuid(),
 		Msg:           make(chan *Message),
 		LastHandshake: time.Now().Unix(),
+		LifeCycle:     60, // @todo hardcode, we set 60s as default life sycle
 	}
 
 	go func(id string, done chan bool) {
 		<-done
 
 		for {
-			time.Sleep(3 * time.Second)
+			time.Sleep(10 * time.Second)
 			clt := GlobalClients().Get(id)
 			if clt == nil {
 				log.Printf("client is nil, id: %s", id)
 				break
 			}
 
-			log.Printf("client id:%s, t:%d\n", clt.Id, time.Now().Unix()-clt.LastHandshake)
-			if 30 < time.Now().Unix()-clt.LastHandshake {
+			log.Printf("client id:%s, t:%d\n", clt.Id, clt.LifeRemain())
+			if !clt.IsLive() {
 				log.Printf("client id:%s destory \n", clt.Id)
 				clt.Destory()
 			}

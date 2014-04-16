@@ -115,16 +115,16 @@ func main() {
 			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
 
-		clt.UpdateActiveTime()
+		clt.Handshake()
 		select {
 		case msg := <-clt.Msg:
 			js, _ := json.Marshal(msg)
 			return 200, string(js)
-		case <-time.After(10 * time.Second):
+		case <-time.After(30 * time.Second):
 			// do nothing
 		}
 
-		clt.UpdateActiveTime()
+		clt.Handshake()
 		return 200, "1"
 	})
 
@@ -135,7 +135,7 @@ func main() {
 			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
 
-		clt.UpdateActiveTime()
+		clt.Handshake()
 		message := &goreal.Message{}
 		defer req.Body.Close()
 		err := json.NewDecoder(req.Body).Decode(message)
@@ -157,7 +157,7 @@ func main() {
 			clt.User.Emit(message.EventName, message)
 		}(message)
 
-		clt.UpdateActiveTime()
+		clt.Handshake()
 		return 200, "1"
 	})
 

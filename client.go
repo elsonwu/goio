@@ -10,6 +10,7 @@ type Client struct {
 	User          *User
 	Msg           chan *Message
 	LastHandshake int64
+	LifeCycle     int64
 }
 
 func (self *Client) Receive(message *Message) {
@@ -17,14 +18,25 @@ func (self *Client) Receive(message *Message) {
 }
 
 func (self *Client) Destory() {
-	defer close(self.Msg)
-
 	self.Emit("destory", &Message{
 		EventName: "destory",
 		Data:      self.Id,
 	})
 }
 
-func (self *Client) UpdateActiveTime() {
+func (self *Client) Handshake() {
 	self.LastHandshake = time.Now().Unix()
+}
+
+func (self *Client) LifeRemain() int64 {
+	remain := self.LifeCycle - (time.Now().Unix() - self.LastHandshake)
+	if 0 >= remain {
+		return 0
+	}
+
+	return remain
+}
+
+func (self *Client) IsLive() bool {
+	return 0 < self.LifeRemain()
 }
