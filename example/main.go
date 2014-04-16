@@ -61,59 +61,8 @@ func main() {
 		}
 
 		clt, done := goreal.NewClient()
-		if 0 == user.Clients.Count() {
-			user.Emit("broadcast", &goreal.Message{
-				EventName: "connect",
-				CallerId:  user.Id,
-			})
-		}
-
 		user.Add(clt)
 		done <- true
-
-		clt.User.On("join", func(message *goreal.Message) {
-			if roomId, ok := message.Data.(string); ok {
-				room := rooms.Get(roomId)
-				if !room.Has(clt.User.Id) {
-					room.Emit("broadcast", &goreal.Message{
-						EventName: "join",
-						Data:      clt.User.Id,
-					})
-
-					clt.User.On("destory", func(message *goreal.Message) {
-						room.Emit("broadcast", &goreal.Message{
-							EventName: "leave",
-							Data:      clt.User.Id,
-						})
-					})
-
-					room.Add(clt.User)
-				}
-			}
-		})
-
-		clt.User.On("leave", func(message *goreal.Message) {
-			if roomId, ok := message.Data.(string); ok {
-				room := rooms.Get(roomId)
-				if room.Has(clt.User.Id) {
-					room.Emit("broadcast", &goreal.Message{
-						EventName: "leave",
-						Data:      clt.User.Id,
-					})
-					room.Delete(clt.User.Id)
-				}
-			}
-		})
-
-		clt.User.On("broadcast", func(message *goreal.Message) {
-			if message.RoomId == "" {
-				for _, room := range *clt.User.Rooms {
-					room.Emit("broadcast", message)
-				}
-			} else {
-				rooms.Get(message.RoomId).Emit("broadcast", message)
-			}
-		})
 
 		return 200, clt.Id
 	})
@@ -154,8 +103,11 @@ func main() {
 		}
 
 		go func(message *goreal.Message) {
-			log.Println("post message: ", *message)
-			if message.RoomId == "" && (message.EventName == "leave" || message.EventName == "leave") {
+			if *flagDebug {
+				log.Println("post message: ", *message)
+			}
+
+			if message.RoomId == "" && (message.EventName == "join" || message.EventName == "leave") {
 				clt.Receive(&goreal.Message{
 					EventName: "error",
 					Data: map[string]string{

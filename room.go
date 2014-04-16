@@ -24,6 +24,7 @@ func (self *Room) Delete(id string) {
 
 	self.Emit("broadcast", &Message{
 		EventName: "leave",
+		RoomId:    self.Id,
 		CallerId:  id,
 	})
 }

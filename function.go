@@ -38,11 +38,75 @@ func GlobalUsers() *Users {
 }
 
 func NewUser(id string) *User {
-	return &User{
+	user := &User{
 		Id:      id,
 		Clients: NewClients(),
 		Rooms:   NewRooms(),
 	}
+
+	user.Emit("broadcast", &Message{
+		EventName: "connect",
+		CallerId:  user.Id,
+	})
+
+	user.On("destory", func(message *Message) {
+		user.Emit("disconnect", &Message{
+			EventName: "disconnect",
+			CallerId:  user.Id,
+		})
+	})
+
+	user.On("disconnect", func(message *Message) {
+		for _, room := range *user.Rooms {
+			room.Receive(message)
+		}
+	})
+
+	user.On("join", func(message *Message) {
+		if roomId, ok := message.Data.(string); ok {
+			room := GlobalRooms().Get(roomId)
+			if !room.Has(user.Id) {
+				room.Emit("broadcast", &Message{
+					EventName: "join",
+					Data:      user.Id,
+				})
+
+				user.On("destory", func(message *Message) {
+					room.Emit("broadcast", &Message{
+						EventName: "leave",
+						Data:      user.Id,
+					})
+				})
+
+				room.Add(user)
+			}
+		}
+	})
+
+	user.On("leave", func(message *Message) {
+		if roomId, ok := message.Data.(string); ok {
+			room := GlobalRooms().Get(roomId)
+			if room.Has(user.Id) {
+				room.Emit("broadcast", &Message{
+					EventName: "leave",
+					Data:      user.Id,
+				})
+				room.Delete(user.Id)
+			}
+		}
+	})
+
+	user.On("broadcast", func(message *Message) {
+		if message.RoomId == "" {
+			for _, room := range *user.Rooms {
+				room.Emit("broadcast", message)
+			}
+		} else {
+			GlobalRooms().Get(message.RoomId).Emit("broadcast", message)
+		}
+	})
+
+	return user
 }
 
 func newRoom(id string) *Room {
