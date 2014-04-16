@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+var UuidLen int = 20
+var LifeCycle int64 = 60
+var Debug bool = false
 var globalClients *Clients
 var globalRooms *Rooms
 var globalUsers *Users
@@ -62,7 +65,7 @@ func NewRooms() *Rooms {
 }
 
 func Uuid() string {
-	return random.String(20)
+	return random.String(UuidLen)
 }
 
 func NewClient() (clt *Client, done chan bool) {
@@ -71,23 +74,32 @@ func NewClient() (clt *Client, done chan bool) {
 		Id:            Uuid(),
 		Msg:           make(chan *Message),
 		LastHandshake: time.Now().Unix(),
-		LifeCycle:     60, // @todo hardcode, we set 60s as default life sycle
+		LifeCycle:     LifeCycle,
 	}
 
 	go func(id string, done chan bool) {
 		<-done
 
 		for {
-			time.Sleep(10 * time.Second)
+			time.Sleep(time.Duration(LifeCycle) * time.Second)
 			clt := GlobalClients().Get(id)
 			if clt == nil {
-				log.Printf("client is nil, id: %s", id)
+				if Debug {
+					log.Printf("client is nil, id: %s", id)
+				}
+
 				break
 			}
 
-			log.Printf("client id:%s, t:%d\n", clt.Id, clt.LifeRemain())
+			if Debug {
+				log.Printf("client id:%s, t:%d\n", clt.Id, clt.LifeRemain())
+			}
+
 			if !clt.IsLive() {
-				log.Printf("client id:%s destory \n", clt.Id)
+				if Debug {
+					log.Printf("client id:%s destory \n", clt.Id)
+				}
+
 				clt.Destory()
 			}
 		}

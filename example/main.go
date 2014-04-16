@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/elsonwu/goreal"
 	"github.com/go-martini/martini"
@@ -11,20 +12,31 @@ import (
 	"time"
 )
 
+var flagHost = flag.String("host", "127.0.0.1", "the server host")
+var flagPort = flag.String("port", "9999", "the server port")
+var flagAllowOrigin = flag.String("alloworigin", "", "the host allow to cross site ajax")
+var flagDebug = flag.Bool("debug", false, "enable debug mode or not")
+var flagClientLifeCycle = flag.Int64("lifecycle", 60, "how many seconds of the client life cycle")
+
 func main() {
-	host := "127.0.0.1:8888"
 	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	flag.Parse()
+	goreal.Debug = *flagDebug
+	goreal.LifeCycle = *flagClientLifeCycle
 
 	clients := goreal.GlobalClients()
 	rooms := goreal.GlobalRooms()
 	users := goreal.GlobalUsers()
 
-	go func() {
-		for {
-			time.Sleep(3 * time.Second)
-			log.Printf("rooms: %d, users: %d, clients: %d \n\n", rooms.Count(), users.Count(), clients.Count())
-		}
-	}()
+	if *flagDebug {
+		go func() {
+			for {
+				time.Sleep(3 * time.Second)
+				log.Printf("rooms: %d, users: %d, clients: %d \n\n", rooms.Count(), users.Count(), clients.Count())
+			}
+		}()
+	}
 
 	martini.Env = martini.Dev
 	router := martini.NewRouter()
@@ -35,10 +47,12 @@ func main() {
 	m.Use(func(res http.ResponseWriter) {
 		res.Header().Set("Content-Type", "application/json")
 		res.Header().Set("Access-Control-Allow-Methods", "GET, POST")
-		// res.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1")
+		if "" != *flagAllowOrigin {
+			res.Header().Set("Access-Control-Allow-Origin", *flagAllowOrigin)
+		}
 	})
 
-	m.Get("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
+	m.Post("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
 		user := users.Get(userId)
 		if user == nil {
@@ -157,6 +171,7 @@ func main() {
 		return 200, ""
 	})
 
+	host := *flagHost + ":" + *flagPort
 	log.Println("Serve at " + host)
 	if err := http.ListenAndServe(host, m); err != nil {
 		log.Println(err)

@@ -37,9 +37,6 @@ func (self *User) Add(clt *Client) {
 	clt.User = self
 	clt.On("destory", func(message *Message) {
 		clt.User.Clients.Delete(clt.Id)
-		if 0 == clt.User.Clients.Count() {
-			clt.User.Destory()
-		}
 	})
 
 	// we add it to global clients too
