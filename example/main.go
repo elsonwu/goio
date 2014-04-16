@@ -45,7 +45,7 @@ func main() {
 	m := &martini.ClassicMartini{mart, router}
 	m.Use(martini.Recovery())
 	m.Use(func(res http.ResponseWriter) {
-		res.Header().Set("Content-Type", "application/json")
+		res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		res.Header().Set("Access-Control-Allow-Methods", "GET, POST")
 		if "" != *flagAllowOrigin {
 			res.Header().Set("Access-Control-Allow-Origin", *flagAllowOrigin)
@@ -142,7 +142,7 @@ func main() {
 		id := params["id"]
 		clt := clients.Get(id)
 		if clt == nil {
-			return 404, fmt.Sprintf("Client %s does not exist\n", id)
+			return 403, fmt.Sprintf("Client %s does not exist\n", id)
 		}
 
 		clt.Handshake()
@@ -150,7 +150,7 @@ func main() {
 		defer req.Body.Close()
 		err := json.NewDecoder(req.Body).Decode(message)
 		if err != nil {
-			return 200, "message format is invalid"
+			return 400, "message format is invalid"
 		}
 
 		go func(message *goreal.Message) {
