@@ -1,37 +1,21 @@
 package goreal
 
-import (
-	"sync"
-)
-
-type rs map[string]*Room
-
-type Rooms struct {
-	rs   rs
-	lock *sync.RWMutex
-}
+type Rooms map[string]*Room
 
 func (self *Rooms) Count() int {
-	return len(self.rs)
+	return len(*self)
 }
 
 func (self *Rooms) Delete(id string) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	delete(self.rs, id)
+	delete(*self, id)
 }
 
 func (self *Rooms) Add(room *Room) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	if self.Has(room.Id) {
 		return
 	}
 
-	self.rs[room.Id] = room
-
+	(*self)[room.Id] = room
 	room.On("broadcast", func(message *Message) {
 		room.Receive(message)
 	})
@@ -50,17 +34,14 @@ func (self *Rooms) Add(room *Room) {
 }
 
 func (self *Rooms) Has(id string) bool {
-	_, ok := self.rs[id]
+	_, ok := (*self)[id]
 	return ok
 }
 
 func (self *Rooms) Get(id string) *Room {
-	if room, ok := self.rs[id]; ok {
+	if room, ok := (*self)[id]; ok {
 		return room
 	}
-
-	self.lock.Lock()
-	defer self.lock.Unlock()
 
 	room := newRoom(id)
 	GlobalRooms().Add(room)

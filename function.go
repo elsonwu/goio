@@ -3,7 +3,6 @@ package goreal
 import (
 	"github.com/elsonwu/random"
 	"log"
-	"sync"
 	"time"
 )
 
@@ -51,52 +50,47 @@ func newRoom(id string) *Room {
 }
 
 func NewUsers() *Users {
-	return &Users{
-		us:   make(us),
-		lock: new(sync.RWMutex),
-	}
+	return &Users{}
 }
 
 func NewClients() *Clients {
-	return &Clients{
-		cs:   make(cs),
-		lock: new(sync.RWMutex),
-	}
+	return &Clients{}
 }
 
 func NewRooms() *Rooms {
-	return &Rooms{
-		rs:   make(rs),
-		lock: new(sync.RWMutex),
-	}
+	return &Rooms{}
 }
 
 func Uuid() string {
 	return random.String(20)
 }
 
-func NewClient() *Client {
-	clt := &Client{
+func NewClient() (clt *Client, done chan bool) {
+	done = make(chan bool)
+	clt = &Client{
 		Id:            Uuid(),
 		Msg:           make(chan *Message),
 		LastHandshake: time.Now().Unix(),
 	}
 
-	go func(id string) {
+	go func(id string, done chan bool) {
+		<-done
+
 		for {
+			time.Sleep(3 * time.Second)
 			clt := GlobalClients().Get(id)
 			if clt == nil {
+				log.Printf("client is nil, id: %s", id)
 				break
 			}
 
-			time.Sleep(3 * time.Second)
 			log.Printf("client id:%s, t:%d\n", clt.Id, time.Now().Unix()-clt.LastHandshake)
 			if 30 < time.Now().Unix()-clt.LastHandshake {
-				log.Printf("Client id:%s destory \n", clt.Id)
+				log.Printf("client id:%s destory \n", clt.Id)
 				clt.Destory()
 			}
 		}
-	}(clt.Id)
+	}(clt.Id, done)
 
-	return clt
+	return clt, done
 }

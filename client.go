@@ -17,6 +17,8 @@ func (self *Client) Receive(message *Message) {
 }
 
 func (self *Client) Destory() {
+	defer close(self.Msg)
+
 	self.Emit("destory", &Message{
 		EventName: "destory",
 		Data:      self.Id,

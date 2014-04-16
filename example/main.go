@@ -22,7 +22,7 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(3 * time.Second)
-			fmt.Printf("rooms: %d, users: %d, clients: %d \n\n", rooms.Count(), users.Count(), clients.Count())
+			log.Printf("rooms: %d, users: %d, clients: %d \n\n", rooms.Count(), users.Count(), clients.Count())
 		}
 	}()
 
@@ -46,7 +46,7 @@ func main() {
 			users.Add(user)
 		}
 
-		clt := goreal.NewClient()
+		clt, done := goreal.NewClient()
 		if 0 == user.Clients.Count() {
 			user.Emit("broadcast", &goreal.Message{
 				EventName: "connect",
@@ -55,7 +55,7 @@ func main() {
 		}
 
 		user.Add(clt)
-		clients.Add(clt)
+		done <- true
 
 		clt.User.On("join", func(message *goreal.Message) {
 			if roomId, ok := message.Data.(string); ok {
@@ -93,7 +93,7 @@ func main() {
 
 		clt.User.On("broadcast", func(message *goreal.Message) {
 			if message.RoomId == "" {
-				for _, room := range clt.User.GetRooms() {
+				for _, room := range *clt.User.Rooms {
 					room.Emit("broadcast", message)
 				}
 			} else {

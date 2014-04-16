@@ -11,14 +11,14 @@ func (self *Room) Has(id string) bool {
 }
 
 func (self *Room) Receive(message *Message) {
-	for _, user := range self.Users.us {
+	for _, user := range *self.Users {
 		go user.Receive(message)
 	}
 }
 
 func (self *Room) Delete(id string) {
-	delete(self.Users.us, id)
-	if 0 == len(self.Users.us) {
+	delete(*self.Users, id)
+	if 0 == self.Users.Count() {
 		self.Destory()
 	}
 

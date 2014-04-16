@@ -11,10 +11,6 @@ func (self *User) Receive(message *Message) {
 	self.Clients.Receive(message)
 }
 
-func (self *User) GetRooms() rs {
-	return self.Rooms.rs
-}
-
 func (self *User) Has(id string) bool {
 	return nil != self.Clients.Get(id)
 }

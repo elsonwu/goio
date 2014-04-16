@@ -1,18 +1,9 @@
 package goreal
 
-import (
-	"sync"
-)
-
-type cs map[string]*Client
-
-type Clients struct {
-	cs   cs
-	lock *sync.RWMutex
-}
+type Clients map[string]*Client
 
 func (self *Clients) Get(id string) *Client {
-	if clt, ok := self.cs[id]; ok {
+	if clt, ok := (*self)[id]; ok {
 		return clt
 	}
 
@@ -20,11 +11,11 @@ func (self *Clients) Get(id string) *Client {
 }
 
 func (self *Clients) Count() int {
-	return len(self.cs)
+	return len(*self)
 }
 
 func (self *Clients) Receive(message *Message) {
-	for _, clt := range self.cs {
+	for _, clt := range *self {
 		go func(clt *Client, msg *Message) {
 			clt.Msg <- msg
 		}(clt, message)
@@ -32,20 +23,15 @@ func (self *Clients) Receive(message *Message) {
 }
 
 func (self *Clients) Delete(id string) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-	delete(self.cs, id)
+	delete(*self, id)
 }
 
 func (self *Clients) Add(clt *Client) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	if nil != self.Get(clt.Id) {
 		return
 	}
 
-	self.cs[clt.Id] = clt
+	(*self)[clt.Id] = clt
 	clt.On("destory", func(message *Message) {
 		self.Delete(clt.Id)
 	})
