@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/elsonwu/goio"
+	"github.com/elsonwu/random"
 	"github.com/go-martini/martini"
 	"log"
 	"net/http"
@@ -46,7 +47,8 @@ func main() {
 	m.Use(martini.Recovery())
 	m.Use(func(res http.ResponseWriter) {
 		res.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		res.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		res.Header().Set("Access-Control-Allow-Credentials", "true")
+		res.Header().Set("Access-Control-Allow-Methods", "GET,POST")
 		if "" != *flagAllowOrigin {
 			res.Header().Set("Access-Control-Allow-Origin", *flagAllowOrigin)
 		}
@@ -126,6 +128,36 @@ func main() {
 
 		return 200, ""
 	})
+
+	if *flagDebug {
+		m.Get("/test", func() (int, string) {
+			for i := 0; i < 1000; i++ {
+				userId := random.Letters(30)
+				user := users.Get(userId)
+				if user == nil {
+					user = goio.NewUser(userId)
+					if user == nil {
+						log.Println("user is nil")
+						continue
+					}
+
+					users.Add(user)
+				}
+
+				clt, done := goio.NewClient()
+				user.Add(clt)
+				done <- true
+
+				user.Emit("join", &goio.Message{
+					RoomId: random.Char(),
+				})
+			}
+
+			return 200, ""
+		})
+	}
+
+	m.Options("/.*", func(req *http.Request) {})
 
 	host := *flagHost + ":" + *flagPort
 	log.Println("Serve at " + host)

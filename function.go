@@ -57,7 +57,7 @@ func NewUser(id string) *User {
 	})
 
 	user.On("disconnect", func(message *Message) {
-		for _, room := range *user.Rooms {
+		for _, room := range user.Rooms.m {
 			room.Receive(message)
 		}
 	})
@@ -69,14 +69,14 @@ func NewUser(id string) *User {
 
 		room := GlobalRooms().Get(message.RoomId)
 		if !room.Has(user.Id) {
-			room.Emit("broadcast", &Message{
+			room.Receive(&Message{
 				EventName: "join",
 				RoomId:    room.Id,
 				Data:      user.Id,
 			})
 
 			user.On("destory", func(message *Message) {
-				room.Emit("broadcast", &Message{
+				room.Receive(&Message{
 					EventName: "leave",
 					Data:      user.Id,
 				})
@@ -102,7 +102,7 @@ func NewUser(id string) *User {
 
 	user.On("broadcast", func(message *Message) {
 		if message.RoomId == "" {
-			for _, room := range *user.Rooms {
+			for _, room := range user.Rooms.m {
 				room.Emit("broadcast", message)
 			}
 		} else {
@@ -121,15 +121,21 @@ func newRoom(id string) *Room {
 }
 
 func NewUsers() *Users {
-	return &Users{}
+	return &Users{
+		m: make(map[string]*User),
+	}
 }
 
 func NewClients() *Clients {
-	return &Clients{}
+	return &Clients{
+		m: make(map[string]*Client),
+	}
 }
 
 func NewRooms() *Rooms {
-	return &Rooms{}
+	return &Rooms{
+		m: make(map[string]*Room),
+	}
 }
 
 func Uuid() string {

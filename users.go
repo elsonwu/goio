@@ -1,12 +1,22 @@
 package goio
 
-type Users map[string]*User
+import (
+	"sync"
+)
+
+type Users struct {
+	m    map[string]*User
+	lock sync.Mutex
+}
 
 func (self *Users) Count() int {
-	return len(*self)
+	return len(self.m)
 }
 
 func (self *Users) Add(user *User) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	if nil != self.Get(user.Id) {
 		return
 	}
@@ -15,15 +25,18 @@ func (self *Users) Add(user *User) {
 		self.Delete(user.Id)
 	})
 
-	(*self)[user.Id] = user
+	self.m[user.Id] = user
 }
 
 func (self *Users) Delete(userId string) {
-	delete(*self, userId)
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	delete(self.m, userId)
 }
 
 func (self *Users) Get(userId string) *User {
-	if user, ok := (*self)[userId]; ok {
+	if user, ok := self.m[userId]; ok {
 		return user
 	}
 

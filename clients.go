@@ -1,9 +1,16 @@
 package goio
 
-type Clients map[string]*Client
+import (
+	"sync"
+)
+
+type Clients struct {
+	m    map[string]*Client
+	lock sync.Mutex
+}
 
 func (self *Clients) Get(id string) *Client {
-	if clt, ok := (*self)[id]; ok {
+	if clt, ok := self.m[id]; ok {
 		return clt
 	}
 
@@ -11,11 +18,11 @@ func (self *Clients) Get(id string) *Client {
 }
 
 func (self *Clients) Count() int {
-	return len(*self)
+	return len(self.m)
 }
 
 func (self *Clients) Receive(message *Message) {
-	for _, clt := range *self {
+	for _, clt := range self.m {
 		go func(clt *Client, msg *Message) {
 			clt.Msg <- msg
 		}(clt, message)
@@ -23,15 +30,20 @@ func (self *Clients) Receive(message *Message) {
 }
 
 func (self *Clients) Delete(id string) {
-	delete(*self, id)
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	delete(self.m, id)
 }
 
 func (self *Clients) Add(clt *Client) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	if nil != self.Get(clt.Id) {
 		return
 	}
 
-	(*self)[clt.Id] = clt
+	self.m[clt.Id] = clt
 	clt.On("destory", func(message *Message) {
 		self.Delete(clt.Id)
 	})
