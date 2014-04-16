@@ -1,4 +1,4 @@
-package goreal
+package goio
 
 type callback func(message *Message)
 

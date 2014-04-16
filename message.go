@@ -1,4 +1,4 @@
-package goreal
+package goio
 
 type Message struct {
 	EventName string      `json:"e"`

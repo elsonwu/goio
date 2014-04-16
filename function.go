@@ -1,4 +1,4 @@
-package goreal
+package goio
 
 import (
 	"github.com/elsonwu/random"

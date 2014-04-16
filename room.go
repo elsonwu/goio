@@ -1,4 +1,4 @@
-package goreal
+package goio
 
 type Room struct {
 	Event
