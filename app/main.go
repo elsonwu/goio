@@ -33,7 +33,7 @@ func main() {
 		go func() {
 			for {
 				time.Sleep(3 * time.Second)
-				log.Printf("rooms: %d, users: %d, clients: %d \n\n", rooms.Count(), users.Count(), clients.Count())
+				log.Printf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
 			}
 		}()
 	}
@@ -75,6 +75,9 @@ func main() {
 		}
 
 		clt.Handshake()
+		// we handshake again after it finished no matter timeout or ok
+		defer clt.Handshake()
+
 		select {
 		case msg := <-clt.Msg:
 			js, _ := json.Marshal(msg)
@@ -83,7 +86,6 @@ func main() {
 			// do nothing
 		}
 
-		clt.Handshake()
 		return 200, ""
 	})
 
@@ -95,6 +97,9 @@ func main() {
 		}
 
 		clt.Handshake()
+		// we handshake again after it finished no matter timeout or ok
+		defer clt.Handshake()
+
 		message := &goio.Message{}
 		defer req.Body.Close()
 		err := json.NewDecoder(req.Body).Decode(message)
@@ -104,7 +109,7 @@ func main() {
 
 		go func(message *goio.Message) {
 			if *flagDebug {
-				log.Println("post message: ", *message)
+				log.Printf("post message: %#v", *message)
 			}
 
 			if message.RoomId == "" && (message.EventName == "join" || message.EventName == "leave") {
@@ -119,7 +124,6 @@ func main() {
 			clt.User.Emit(message.EventName, message)
 		}(message)
 
-		clt.Handshake()
 		return 200, ""
 	})
 

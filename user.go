@@ -17,7 +17,7 @@ func (self *User) Has(id string) bool {
 
 func (self *User) Delete(id string) {
 	self.Clients.Delete(id)
-	if 0 < self.Clients.Count() {
+	if 0 == self.Clients.Count() {
 		self.Destory()
 	}
 }
@@ -36,7 +36,7 @@ func (self *User) Add(clt *Client) {
 
 	clt.User = self
 	clt.On("destory", func(message *Message) {
-		clt.User.Clients.Delete(clt.Id)
+		clt.User.Delete(clt.Id)
 	})
 
 	// we add it to global clients too

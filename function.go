@@ -63,23 +63,26 @@ func NewUser(id string) *User {
 	})
 
 	user.On("join", func(message *Message) {
-		if roomId, ok := message.Data.(string); ok {
-			room := GlobalRooms().Get(roomId)
-			if !room.Has(user.Id) {
+		if message.RoomId == "" {
+			return
+		}
+
+		room := GlobalRooms().Get(message.RoomId)
+		if !room.Has(user.Id) {
+			room.Emit("broadcast", &Message{
+				EventName: "join",
+				RoomId:    room.Id,
+				Data:      user.Id,
+			})
+
+			user.On("destory", func(message *Message) {
 				room.Emit("broadcast", &Message{
-					EventName: "join",
+					EventName: "leave",
 					Data:      user.Id,
 				})
+			})
 
-				user.On("destory", func(message *Message) {
-					room.Emit("broadcast", &Message{
-						EventName: "leave",
-						Data:      user.Id,
-					})
-				})
-
-				room.Add(user)
-			}
+			room.Add(user)
 		}
 	})
 
@@ -89,6 +92,7 @@ func NewUser(id string) *User {
 			if room.Has(user.Id) {
 				room.Emit("broadcast", &Message{
 					EventName: "leave",
+					RoomId:    room.Id,
 					Data:      user.Id,
 				})
 				room.Delete(user.Id)
