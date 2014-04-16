@@ -101,11 +101,7 @@ func main() {
 			}
 		})
 
-		js, _ := json.Marshal(goreal.Message{
-			Data:     clt.Id,
-			CallerId: userId,
-		})
-		return 200, string(js)
+		return 200, clt.Id
 	})
 
 	m.Get("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
@@ -125,7 +121,7 @@ func main() {
 		}
 
 		clt.Handshake()
-		return 200, "1"
+		return 200, ""
 	})
 
 	m.Post("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
@@ -158,7 +154,7 @@ func main() {
 		}(message)
 
 		clt.Handshake()
-		return 200, "1"
+		return 200, ""
 	})
 
 	log.Println("Serve at " + host)
