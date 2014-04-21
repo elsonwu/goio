@@ -1,12 +1,20 @@
 package goio
 
+import (
+	"sync"
+)
+
 type callback func(message *Message)
 
 type Event struct {
 	evts map[string][]callback
+	lock sync.RWMutex
 }
 
 func (self *Event) On(eventName string, fn callback) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	if self.evts == nil {
 		self.evts = make(map[string][]callback)
 	}
@@ -19,9 +27,16 @@ func (self *Event) On(eventName string, fn callback) {
 }
 
 func (self *Event) Emit(eventName string, message *Message) {
-	if _, ok := self.evts[eventName]; ok {
-		for _, fn := range self.evts[eventName] {
-			fn(message)
-		}
+	self.lock.Lock()
+	if _, ok := self.evts[eventName]; !ok {
+		self.lock.Unlock()
+		return
+	}
+
+	evts := self.evts[eventName]
+	self.lock.Unlock()
+
+	for _, fn := range evts {
+		fn(message)
 	}
 }

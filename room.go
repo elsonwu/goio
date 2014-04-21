@@ -1,40 +1,47 @@
 package goio
 
+import (
+	"sync"
+)
+
 type Room struct {
 	Event
-	Id    string
-	Users *Users
+	Id      string
+	UserIds MapBool
+	lock    sync.RWMutex
 }
 
 func (self *Room) Has(id string) bool {
-	return nil != self.Users.Get(id)
+	return self.UserIds.Has(id)
 }
 
 func (self *Room) Receive(message *Message) {
-	for _, user := range self.Users.m {
-		go user.Receive(message)
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	for uid := range self.UserIds.Map {
+		user := GlobalUsers().Get(uid)
+		if user != nil {
+			user.Receive(message)
+		}
 	}
 }
 
 func (self *Room) Delete(id string) {
-	delete(self.Users.m, id)
-	if 0 == self.Users.Count() {
+	self.UserIds.Delete(id)
+	self.Receive(&Message{
+		EventName: "leave",
+		CallerId:  id,
+		RoomId:    self.Id,
+	})
+
+	if 0 == self.UserIds.Count() {
 		self.Destory()
 	}
-
-	self.Emit("broadcast", &Message{
-		EventName: "leave",
-		RoomId:    self.Id,
-		CallerId:  id,
-	})
 }
 
 func (self *Room) Destory() {
-	self.Emit("destory", &Message{
-		EventName: "destory",
-		RoomId:    self.Id,
-		CallerId:  self.Id,
-	})
+	self.Emit("destory", nil)
 }
 
 func (self *Room) Add(user *User) {
@@ -42,10 +49,16 @@ func (self *Room) Add(user *User) {
 		return
 	}
 
-	user.Rooms.Add(self)
+	self.Receive(&Message{
+		EventName: "join",
+		RoomId:    self.Id,
+		CallerId:  user.Id,
+	})
+
 	user.On("destory", func(message *Message) {
 		self.Delete(user.Id)
 	})
 
-	self.Users.Add(user)
+	user.RoomIds.Add(self.Id)
+	self.UserIds.Add(user.Id)
 }

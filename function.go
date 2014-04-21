@@ -9,132 +9,101 @@ import (
 var UuidLen int = 20
 var LifeCycle int64 = 60
 var Debug bool = false
-var globalClients *Clients
-var globalRooms *Rooms
-var globalUsers *Users
+var GClients *Clients
+var GRooms *Rooms
+var GUsers *Users
 
 func GlobalClients() *Clients {
-	if globalClients == nil {
-		globalClients = NewClients()
+	if GClients == nil {
+		GClients = NewClients()
 	}
 
-	return globalClients
+	return GClients
 }
 
 func GlobalRooms() *Rooms {
-	if globalRooms == nil {
-		globalRooms = NewRooms()
+	if GRooms == nil {
+		GRooms = NewRooms()
 	}
 
-	return globalRooms
+	return GRooms
 }
 
 func GlobalUsers() *Users {
-	if globalUsers == nil {
-		globalUsers = NewUsers()
+	if GUsers == nil {
+		GUsers = NewUsers()
 	}
 
-	return globalUsers
+	return GUsers
 }
 
 func NewUser(id string) *User {
 	user := &User{
-		Id:      id,
-		Clients: NewClients(),
-		Rooms:   NewRooms(),
+		Id: id,
+		ClientIds: MapBool{
+			Map: make(mapBool),
+		},
+		RoomIds: MapBool{
+			Map: make(mapBool),
+		},
 	}
 
-	user.Emit("broadcast", &Message{
-		EventName: "connect",
-		CallerId:  user.Id,
-	})
-
-	user.On("destory", func(message *Message) {
-		user.Emit("disconnect", &Message{
-			EventName: "disconnect",
-			CallerId:  user.Id,
-		})
-	})
-
-	user.On("disconnect", func(message *Message) {
-		for _, room := range user.Rooms.m {
-			room.Receive(message)
-		}
-	})
-
 	user.On("join", func(message *Message) {
-		if message.RoomId == "" {
-			return
-		}
-
-		room := GlobalRooms().Get(message.RoomId)
-		if !room.Has(user.Id) {
-			room.Receive(&Message{
-				EventName: "join",
-				RoomId:    room.Id,
-				Data:      user.Id,
-			})
-
-			user.On("destory", func(message *Message) {
-				room.Receive(&Message{
-					EventName: "leave",
-					Data:      user.Id,
-				})
-			})
-
-			room.Add(user)
-		}
+		GlobalRooms().Get(message.RoomId, true).Add(user)
 	})
 
 	user.On("leave", func(message *Message) {
-		if roomId, ok := message.Data.(string); ok {
-			room := GlobalRooms().Get(roomId)
-			if room.Has(user.Id) {
-				room.Emit("broadcast", &Message{
-					EventName: "leave",
-					RoomId:    room.Id,
-					Data:      user.Id,
-				})
-				room.Delete(user.Id)
-			}
+		room := GlobalRooms().Get(message.RoomId, false)
+		if room == nil {
+			return
 		}
+
+		room.Delete(user.Id)
 	})
 
 	user.On("broadcast", func(message *Message) {
 		if message.RoomId == "" {
-			for _, room := range user.Rooms.m {
-				room.Emit("broadcast", message)
+			for roomId, _ := range user.RoomIds.Map {
+				room := GlobalRooms().Get(roomId, true)
+				room.Receive(message)
 			}
 		} else {
-			GlobalRooms().Get(message.RoomId).Emit("broadcast", message)
+			room := GlobalRooms().Get(message.RoomId, true)
+			room.Receive(message)
 		}
 	})
 
+	GlobalUsers().Add(user)
 	return user
 }
 
-func newRoom(id string) *Room {
-	return &Room{
-		Id:    id,
-		Users: NewUsers(),
+func NewRoom(id string) *Room {
+	room := &Room{
+		Id: id,
+		UserIds: MapBool{
+			Map: make(mapBool),
+		},
 	}
+
+	GlobalRooms().Add(room)
+	return room
 }
 
 func NewUsers() *Users {
 	return &Users{
-		m: make(map[string]*User),
+		Map: make(map[string]*User),
 	}
 }
 
 func NewClients() *Clients {
 	return &Clients{
-		m: make(map[string]*Client),
+		Map: make(map[string]*Client),
 	}
 }
 
 func NewRooms() *Rooms {
 	return &Rooms{
-		m: make(map[string]*Room),
+		Map: make(map[string]*Room),
 	}
 }
 
@@ -143,14 +112,15 @@ func Uuid() string {
 }
 
 func NewClient() (clt *Client, done chan bool) {
-	done = make(chan bool)
 	clt = &Client{
 		Id:            Uuid(),
-		Msg:           make(chan *Message),
+		Messages:      make([]*Message, 0),
 		LastHandshake: time.Now().Unix(),
 		LifeCycle:     LifeCycle,
 	}
 
+	GlobalClients().Add(clt)
+	done = make(chan bool)
 	go func(id string, done chan bool) {
 		<-done
 
@@ -170,10 +140,7 @@ func NewClient() (clt *Client, done chan bool) {
 			}
 
 			if !clt.IsLive() {
-				if Debug {
-					log.Printf("client id:%s destory \n", clt.Id)
-				}
-
+				log.Printf("client id:%s destory \n", clt.Id)
 				clt.Destory()
 			}
 		}

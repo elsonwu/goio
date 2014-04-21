@@ -5,38 +5,43 @@ import (
 )
 
 type Users struct {
-	m    map[string]*User
-	lock sync.Mutex
+	Map  map[string]*User
+	lock sync.RWMutex
 }
 
 func (self *Users) Count() int {
-	return len(self.m)
-}
-
-func (self *Users) Add(user *User) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
+	return len(self.Map)
+}
+
+func (self *Users) Add(user *User) {
 	if nil != self.Get(user.Id) {
 		return
 	}
 
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	user.On("destory", func(message *Message) {
 		self.Delete(user.Id)
 	})
 
-	self.m[user.Id] = user
+	self.Map[user.Id] = user
 }
 
 func (self *Users) Delete(userId string) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
-	delete(self.m, userId)
+	delete(self.Map, userId)
 }
 
 func (self *Users) Get(userId string) *User {
-	if user, ok := self.m[userId]; ok {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	if user, ok := self.Map[userId]; ok {
 		return user
 	}
 

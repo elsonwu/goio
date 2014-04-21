@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/elsonwu/goio"
-	"github.com/elsonwu/random"
 	"github.com/go-martini/martini"
 	"log"
 	"net/http"
@@ -30,14 +29,12 @@ func main() {
 	rooms := goio.GlobalRooms()
 	users := goio.GlobalUsers()
 
-	if *flagDebug {
-		go func() {
-			for {
-				time.Sleep(3 * time.Second)
-				log.Printf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
-			}
-		}()
-	}
+	go func() {
+		for {
+			time.Sleep(3 * time.Second)
+			log.Printf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
+		}
+	}()
 
 	martini.Env = martini.Dev
 	router := martini.NewRouter()
@@ -59,7 +56,6 @@ func main() {
 		user := users.Get(userId)
 		if user == nil {
 			user = goio.NewUser(userId)
-			users.Add(user)
 		}
 
 		clt, done := goio.NewClient()
@@ -80,12 +76,24 @@ func main() {
 		// we handshake again after it finished no matter timeout or ok
 		defer clt.Handshake()
 
-		select {
-		case msg := <-clt.Msg:
-			js, _ := json.Marshal(msg)
-			return 200, string(js)
-		case <-time.After(30 * time.Second):
-			// do nothing
+		timeNow := time.Now().Unix()
+		for {
+			if 0 < len(clt.Messages) {
+				msg := clt.Messages[0:1]
+				clt.Messages = clt.Messages[1:]
+				js, err := json.Marshal(msg)
+				if err != nil {
+					return 500, err.Error()
+				}
+
+				return 200, string(js)
+			}
+
+			if time.Now().Unix() > timeNow+30 {
+				break
+			}
+
+			time.Sleep(3 * time.Second)
 		}
 
 		return 200, ""
@@ -96,6 +104,11 @@ func main() {
 		clt := clients.Get(id)
 		if clt == nil {
 			return 403, fmt.Sprintf("Client %s does not exist\n", id)
+		}
+
+		user := users.Get(clt.UserId)
+		if user == nil {
+			return 403, fmt.Sprintf("Client %s does not connect with any user\n", id)
 		}
 
 		clt.Handshake()
@@ -123,39 +136,14 @@ func main() {
 				})
 			}
 
-			clt.User.Emit(message.EventName, message)
+			// We change CallerId as current user
+			message.CallerId = user.Id
+			user.Emit(message.EventName, message)
+			log.Printf("post message %#v", *message)
 		}(message)
 
 		return 200, ""
 	})
-
-	if *flagDebug {
-		m.Get("/test", func() (int, string) {
-			for i := 0; i < 1000; i++ {
-				userId := random.Letters(30)
-				user := users.Get(userId)
-				if user == nil {
-					user = goio.NewUser(userId)
-					if user == nil {
-						log.Println("user is nil")
-						continue
-					}
-
-					users.Add(user)
-				}
-
-				clt, done := goio.NewClient()
-				user.Add(clt)
-				done <- true
-
-				user.Emit("join", &goio.Message{
-					RoomId: random.Char(),
-				})
-			}
-
-			return 200, ""
-		})
-	}
 
 	m.Options("/.*", func(req *http.Request) {})
 

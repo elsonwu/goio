@@ -1,45 +1,54 @@
 package goio
 
+import (
+	"log"
+	"sync"
+)
+
 type User struct {
 	Event
-	Id      string
-	Clients *Clients
-	Rooms   *Rooms
+	Id        string
+	ClientIds MapBool
+	RoomIds   MapBool
+	lock      sync.RWMutex
 }
 
 func (self *User) Receive(message *Message) {
-	self.Clients.Receive(message)
-}
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
-func (self *User) Has(id string) bool {
-	return nil != self.Clients.Get(id)
+	for cltId := range self.ClientIds.Map {
+		clt := GlobalClients().Get(cltId)
+		if clt != nil {
+			clt.Receive(message)
+		}
+	}
 }
 
 func (self *User) Delete(id string) {
-	self.Clients.Delete(id)
-	if 0 == self.Clients.Count() {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	self.ClientIds.Delete(id)
+	if 0 == self.ClientIds.Count() {
+		log.Println("user client count 0")
 		self.Destory()
 	}
 }
 
 func (self *User) Destory() {
-	self.Emit("destory", &Message{
-		EventName: "destory",
-		CallerId:  self.Id,
-	})
+	self.Emit("destory", nil)
 }
 
 func (self *User) Add(clt *Client) {
-	if self.Has(clt.Id) {
+	if self.ClientIds.Has(clt.Id) {
 		return
 	}
 
-	clt.User = self
 	clt.On("destory", func(message *Message) {
-		clt.User.Delete(clt.Id)
+		self.Delete(clt.Id)
 	})
 
-	// we add it to global clients too
-	GlobalClients().Add(clt)
-	self.Clients.Add(clt)
+	clt.UserId = self.Id
+	self.ClientIds.Add(clt.Id)
 }

@@ -1,30 +1,35 @@
 package goio
 
 import (
+	"sync"
 	"time"
 )
 
 type Client struct {
 	Event
 	Id            string
-	User          *User
-	Msg           chan *Message
+	UserId        string
+	Messages      []*Message
 	LastHandshake int64
 	LifeCycle     int64
+	lock          sync.RWMutex
 }
 
 func (self *Client) Receive(message *Message) {
-	self.Msg <- message
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	self.Messages = append(self.Messages, message)
 }
 
 func (self *Client) Destory() {
-	self.Emit("destory", &Message{
-		EventName: "destory",
-		Data:      self.Id,
-	})
+	self.Emit("destory", nil)
 }
 
 func (self *Client) Handshake() {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	self.LastHandshake = time.Now().Unix()
 }
 

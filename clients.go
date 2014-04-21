@@ -5,12 +5,12 @@ import (
 )
 
 type Clients struct {
-	m    map[string]*Client
-	lock sync.Mutex
+	Map  map[string]*Client
+	lock sync.RWMutex
 }
 
 func (self *Clients) Get(id string) *Client {
-	if clt, ok := self.m[id]; ok {
+	if clt, ok := self.Map[id]; ok {
 		return clt
 	}
 
@@ -18,33 +18,29 @@ func (self *Clients) Get(id string) *Client {
 }
 
 func (self *Clients) Count() int {
-	return len(self.m)
-}
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
-func (self *Clients) Receive(message *Message) {
-	for _, clt := range self.m {
-		go func(clt *Client, msg *Message) {
-			clt.Msg <- msg
-		}(clt, message)
-	}
+	return len(self.Map)
 }
 
 func (self *Clients) Delete(id string) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
-	delete(self.m, id)
+
+	delete(self.Map, id)
 }
 
 func (self *Clients) Add(clt *Client) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	if nil != self.Get(clt.Id) {
 		return
 	}
 
-	self.m[clt.Id] = clt
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	clt.On("destory", func(message *Message) {
 		self.Delete(clt.Id)
 	})
+
+	self.Map[clt.Id] = clt
 }
