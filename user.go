@@ -14,6 +14,12 @@ type User struct {
 }
 
 func (self *User) Receive(message *Message) {
+
+	// Don't send message to myself
+	if message != nil && message.CallerId == self.Id {
+		return
+	}
+
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
