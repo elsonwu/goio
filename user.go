@@ -10,7 +10,16 @@ type User struct {
 	Id        string
 	ClientIds MapBool
 	RoomIds   MapBool
+	data      *TempData
 	lock      sync.RWMutex
+}
+
+func (self *User) Data() *TempData {
+	if self.data == nil {
+		self.data = &TempData{}
+	}
+
+	return self.data
 }
 
 func (self *User) Receive(message *Message) {

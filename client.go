@@ -15,6 +15,13 @@ type Client struct {
 	lock          sync.RWMutex
 }
 
+func (self *Client) CleanMessages() {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	self.Messages = make([]*Message, 0)
+}
+
 func (self *Client) Receive(message *Message) {
 	self.lock.Lock()
 	defer self.lock.Unlock()

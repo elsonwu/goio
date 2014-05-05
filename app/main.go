@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/elsonwu/goio"
 	"github.com/go-martini/martini"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"runtime"
@@ -75,6 +76,52 @@ func main() {
 		})
 	}
 
+	m.Get("/get_data/:user_id/:key", func(params martini.Params, req *http.Request) (int, string) {
+		userId := params["user_id"]
+		if userId == "" {
+			return 403, "user_id is missing"
+		}
+
+		key := params["key"]
+		if key == "" {
+			return 403, "key is missing"
+		}
+
+		user := users.Get(userId)
+		if user == nil {
+			return 200, ""
+		}
+
+		return 200, user.Data().Get(key)
+	})
+
+	m.Post("/set_data/:client_id/:key", func(params martini.Params, req *http.Request) (int, string) {
+		val, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			return 500, err.Error()
+		}
+
+		clientId := params["client_id"]
+		if clientId == "" {
+			return 403, "client_id is missing"
+		}
+
+		key := params["key"]
+		if key == "" {
+			return 403, "key is missing"
+		}
+
+		clt := clients.Get(clientId)
+		if clt != nil && clt.UserId != "" {
+			user := users.Get(clt.UserId)
+			if user != nil {
+				user.Data().Set(key, string(val))
+			}
+		}
+
+		return 200, ""
+	})
+
 	m.Post("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
 		user := users.Get(userId)
@@ -89,8 +136,8 @@ func main() {
 		return 200, clt.Id
 	})
 
-	m.Get("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
-		id := params["id"]
+	m.Get("/message/:client_id", func(params martini.Params, req *http.Request) (int, string) {
+		id := params["client_id"]
 		clt := clients.Get(id)
 		if clt == nil {
 			return 404, fmt.Sprintf("Client %s does not exist\n", id)
@@ -104,6 +151,8 @@ func main() {
 		for {
 			if 0 < len(clt.Messages) {
 				js, err := json.Marshal(clt.Messages)
+				clt.CleanMessages()
+
 				if err != nil {
 					return 500, err.Error()
 				}
@@ -121,8 +170,8 @@ func main() {
 		return 204, ""
 	})
 
-	m.Post("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
-		id := params["id"]
+	m.Post("/message/:client_id", func(params martini.Params, req *http.Request) (int, string) {
+		id := params["client_id"]
 		clt := clients.Get(id)
 		if clt == nil {
 			return 403, fmt.Sprintf("Client %s does not exist\n", id)
@@ -141,27 +190,28 @@ func main() {
 		defer req.Body.Close()
 		err := json.NewDecoder(req.Body).Decode(message)
 		if err != nil {
-			return 400, "message format is invalid"
+			clt.Receive(&goio.Message{
+				EventName: "error",
+				Data:      "message format is invalid",
+			})
+		} else {
+			go func(message *goio.Message) {
+				if *flagDebug {
+					log.Printf("post message: %#v", *message)
+				}
+
+				if message.RoomId == "" && (message.EventName == "join" || message.EventName == "leave") {
+					clt.Receive(&goio.Message{
+						EventName: "error",
+						Data:      "room id is missing",
+					})
+				}
+
+				// We change CallerId as current user
+				message.CallerId = user.Id
+				user.Emit(message.EventName, message)
+			}(message)
 		}
-
-		go func(message *goio.Message) {
-			if *flagDebug {
-				log.Printf("post message: %#v", *message)
-			}
-
-			if message.RoomId == "" && (message.EventName == "join" || message.EventName == "leave") {
-				clt.Receive(&goio.Message{
-					EventName: "error",
-					Data: map[string]string{
-						"error": "room id is missing",
-					},
-				})
-			}
-
-			// We change CallerId as current user
-			message.CallerId = user.Id
-			user.Emit(message.EventName, message)
-		}(message)
 
 		return 204, ""
 	})
