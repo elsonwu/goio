@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -29,12 +30,14 @@ func main() {
 	rooms := goio.GlobalRooms()
 	users := goio.GlobalUsers()
 
-	go func() {
-		for {
-			time.Sleep(3 * time.Second)
-			log.Printf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
-		}
-	}()
+	if *flagDebug {
+		go func() {
+			for {
+				time.Sleep(3 * time.Second)
+				log.Printf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
+			}
+		}()
+	}
 
 	martini.Env = martini.Dev
 	router := martini.NewRouter()
@@ -50,6 +53,27 @@ func main() {
 			res.Header().Set("Access-Control-Allow-Origin", *flagAllowOrigin)
 		}
 	})
+
+	if *flagDebug {
+		m.Get("/test", func() string {
+			for i := 0; i < 10000; i++ {
+				userId := strconv.Itoa(i)
+				user := users.Get(userId)
+				if user == nil {
+					user = goio.NewUser(userId)
+				}
+
+				clt, done := goio.NewClient()
+				user.Add(clt)
+				done <- true
+
+				room := rooms.Get(strconv.Itoa(i%100), true)
+				room.Add(user)
+			}
+
+			return "ok"
+		})
+	}
 
 	m.Post("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
@@ -79,9 +103,7 @@ func main() {
 		timeNow := time.Now().Unix()
 		for {
 			if 0 < len(clt.Messages) {
-				msg := clt.Messages[0:1]
-				clt.Messages = clt.Messages[1:]
-				js, err := json.Marshal(msg)
+				js, err := json.Marshal(clt.Messages)
 				if err != nil {
 					return 500, err.Error()
 				}
@@ -96,7 +118,7 @@ func main() {
 			time.Sleep(3 * time.Second)
 		}
 
-		return 200, ""
+		return 204, ""
 	})
 
 	m.Post("/message/:id", func(params martini.Params, req *http.Request) (int, string) {
@@ -139,10 +161,9 @@ func main() {
 			// We change CallerId as current user
 			message.CallerId = user.Id
 			user.Emit(message.EventName, message)
-			log.Printf("post message %#v", *message)
 		}(message)
 
-		return 200, ""
+		return 204, ""
 	})
 
 	m.Options("/.*", func(req *http.Request) {})
