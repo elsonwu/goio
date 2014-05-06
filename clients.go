@@ -38,7 +38,7 @@ func (self *Clients) Add(clt *Client) {
 
 	self.lock.Lock()
 	defer self.lock.Unlock()
-	clt.On("destory", func(message *Message) {
+	clt.On("destroy", func(message *Message) {
 		self.Delete(clt.Id)
 	})
 

@@ -160,7 +160,7 @@ func main() {
 		id := params["client_id"]
 		clt := clients.Get(id)
 		if clt != nil {
-			clt.Destory()
+			clt.Destroy()
 		}
 
 		return 204, ""

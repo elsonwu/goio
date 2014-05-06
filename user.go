@@ -47,12 +47,12 @@ func (self *User) Delete(id string) {
 	self.ClientIds.Delete(id)
 	if 0 == self.ClientIds.Count() {
 		log.Println("user client count 0")
-		self.Destory()
+		self.Destroy()
 	}
 }
 
-func (self *User) Destory() {
-	self.Emit("destory", nil)
+func (self *User) Destroy() {
+	self.Emit("destroy", nil)
 }
 
 func (self *User) Add(clt *Client) {
@@ -60,7 +60,7 @@ func (self *User) Add(clt *Client) {
 		return
 	}
 
-	clt.On("destory", func(message *Message) {
+	clt.On("destroy", func(message *Message) {
 		self.Delete(clt.Id)
 	})
 

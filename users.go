@@ -23,7 +23,7 @@ func (self *Users) Add(user *User) {
 
 	self.lock.Lock()
 	defer self.lock.Unlock()
-	user.On("destory", func(message *Message) {
+	user.On("destroy", func(message *Message) {
 		self.Delete(user.Id)
 	})
 

@@ -29,8 +29,8 @@ func (self *Client) Receive(message *Message) {
 	self.Messages = append(self.Messages, message)
 }
 
-func (self *Client) Destory() {
-	self.Emit("destory", nil)
+func (self *Client) Destroy() {
+	self.Emit("destroy", nil)
 }
 
 func (self *Client) Handshake() {

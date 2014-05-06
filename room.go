@@ -36,12 +36,12 @@ func (self *Room) Delete(id string) {
 	})
 
 	if 0 == self.UserIds.Count() {
-		self.Destory()
+		self.Destroy()
 	}
 }
 
-func (self *Room) Destory() {
-	self.Emit("destory", nil)
+func (self *Room) Destroy() {
+	self.Emit("destroy", nil)
 }
 
 func (self *Room) Add(user *User) {
@@ -55,7 +55,7 @@ func (self *Room) Add(user *User) {
 		CallerId:  user.Id,
 	})
 
-	user.On("destory", func(message *Message) {
+	user.On("destroy", func(message *Message) {
 		self.Delete(user.Id)
 	})
 

@@ -31,7 +31,7 @@ func (self *Rooms) Add(room *Room) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
-	room.On("destory", func(message *Message) {
+	room.On("destroy", func(message *Message) {
 		self.Delete(room.Id)
 	})
 
