@@ -156,6 +156,16 @@ func main() {
 		return 200, clt.Id
 	})
 
+	m.Get("/kill_client/:client_id", func(params martini.Params, req *http.Request) (int, string) {
+		id := params["client_id"]
+		clt := clients.Get(id)
+		if clt != nil {
+			clt.Destory()
+		}
+
+		return 204, ""
+	})
+
 	m.Get("/message/:client_id", func(params martini.Params, req *http.Request) (int, string) {
 		id := params["client_id"]
 		clt := clients.Get(id)
