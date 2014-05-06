@@ -49,10 +49,18 @@ func NewUser(id string) *User {
 	}
 
 	user.On("join", func(message *Message) {
+		if user.RoomIds.Has(message.RoomId) {
+			return
+		}
+
 		GlobalRooms().Get(message.RoomId, true).Add(user)
 	})
 
 	user.On("leave", func(message *Message) {
+		if !user.RoomIds.Has(message.RoomId) {
+			return
+		}
+
 		room := GlobalRooms().Get(message.RoomId, false)
 		if room == nil {
 			return
