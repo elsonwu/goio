@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/elsonwu/goio"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -18,7 +18,8 @@ var flagHost = flag.String("host", "127.0.0.1", "the server host")
 var flagPort = flag.String("port", "9999", "the server port")
 var flagAllowOrigin = flag.String("alloworigin", "", "the host allow to cross site ajax")
 var flagDebug = flag.Bool("debug", false, "enable debug mode or not")
-var flagClientLifeCycle = flag.Int64("lifecycle", 60, "how many seconds of the client life cycle")
+var flagClientLifeCycle = flag.Int64("lifecycle", 30, "how many seconds of the client life cycle")
+var flagClientMessageTimeout = flag.Int64("messagetimeout", 15, "how many seconds of the client keep waiting for new messages")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -122,6 +123,25 @@ func main() {
 		return 200, ""
 	})
 
+	m.Post("/online_status", func(params martini.Params, req *http.Request) (int, string) {
+		val, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			return 500, err.Error()
+		}
+
+		userIds := strings.Split(string(val), ",")
+		status := ""
+		for _, userId := range userIds {
+			if nil == users.Get(userId) {
+				status += "0,"
+			} else {
+				status += "1,"
+			}
+		}
+
+		return 200, status
+	})
+
 	m.Post("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
 		user := users.Get(userId)
@@ -150,21 +170,20 @@ func main() {
 		timeNow := time.Now().Unix()
 		for {
 			if 0 < len(clt.Messages) {
-				js, err := json.Marshal(clt.Messages)
-				clt.CleanMessages()
-
-				if err != nil {
-					return 500, err.Error()
+				val := ""
+				for _, msg := range clt.Messages {
+					v := msg.EventName + "|" + msg.RoomId + "|" + msg.CallerId + "|" + msg.Data
+					val += (v + "\n")
 				}
-
-				return 200, string(js)
+				clt.CleanMessages()
+				return 200, val
 			}
 
-			if time.Now().Unix() > timeNow+30 {
+			if time.Now().Unix() > timeNow+*flagClientMessageTimeout {
 				break
 			}
 
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 
 		return 204, ""
@@ -188,30 +207,38 @@ func main() {
 
 		message := &goio.Message{}
 		defer req.Body.Close()
-		err := json.NewDecoder(req.Body).Decode(message)
-		if err != nil {
-			clt.Receive(&goio.Message{
-				EventName: "error",
-				Data:      "message format is invalid",
-			})
-		} else {
-			go func(message *goio.Message) {
-				if *flagDebug {
-					log.Printf("post message: %#v", *message)
-				}
 
-				if message.RoomId == "" && (message.EventName == "join" || message.EventName == "leave") {
-					clt.Receive(&goio.Message{
-						EventName: "error",
-						Data:      "room id is missing",
-					})
-				}
+		//<event name>|<room id>|<user id>|<data>
+		//when post, we skip user id
+		val, _ := ioutil.ReadAll(req.Body)
+		msg := strings.SplitN(string(val), "|", 4)
+		message.EventName = msg[0]
+		message.CallerId = clt.UserId
 
-				// We change CallerId as current user
-				message.CallerId = user.Id
-				user.Emit(message.EventName, message)
-			}(message)
+		if 2 <= len(msg) {
+			message.RoomId = msg[1]
 		}
+
+		if 4 <= len(msg) {
+			message.Data = msg[3]
+		}
+
+		go func(message *goio.Message) {
+			if *flagDebug {
+				log.Printf("post message: %#v", *message)
+			}
+
+			if message.RoomId == "" && (message.EventName == "join" || message.EventName == "leave") {
+				clt.Receive(&goio.Message{
+					EventName: "error",
+					Data:      "room id is missing",
+				})
+			}
+
+			// We change CallerId as current user
+			message.CallerId = user.Id
+			user.Emit(message.EventName, message)
+		}(message)
 
 		return 204, ""
 	})
