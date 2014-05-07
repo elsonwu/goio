@@ -19,12 +19,18 @@ func (self *Client) CleanMessages() {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
-	self.Messages = make([]*Message, 0)
+	//make a default cap value, it's enough for most use
+	self.Messages = make([]*Message, 0, 20)
 }
 
 func (self *Client) Receive(message *Message) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
+
+	// if there are too many messages, we limit the max to 80
+	if len(self.Messages) >= 80 {
+		self.Messages = self.Messages[1:]
+	}
 
 	self.Messages = append(self.Messages, message)
 }
