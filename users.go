@@ -36,6 +36,7 @@ func (self *Users) Add(user *User) {
 		self.Delete(user.Id)
 	})
 
+	// send global message to all members
 	self.Receive(&Message{
 		EventName: "join",
 		CallerId:  user.Id,
@@ -48,9 +49,8 @@ func (self *Users) Add(user *User) {
 
 func (self *Users) Delete(userId string) {
 	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	delete(self.Map, userId)
+	self.lock.Unlock()
 
 	// send global message to all members
 	self.Receive(&Message{

@@ -122,7 +122,7 @@ func Uuid() string {
 func NewClient() (clt *Client, done chan bool) {
 	clt = &Client{
 		Id:            Uuid(),
-		Messages:      make([]*Message, 0),
+		Messages:      make([]*Message, 0, 20),
 		LastHandshake: time.Now().Unix(),
 		LifeCycle:     LifeCycle,
 	}
