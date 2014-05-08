@@ -77,6 +77,20 @@ func main() {
 		})
 	}
 
+	m.Get("/room_users/:room_id", func(params martini.Params, req *http.Request) (int, string) {
+		roomId := params["room_id"]
+		if roomId == "" {
+			return 403, "room_id is missing"
+		}
+
+		room := rooms.Get(roomId, false)
+		if room == nil {
+			return 200, ""
+		}
+
+		return 200, strings.Join(room.UserIds.Array(), ",")
+	})
+
 	m.Get("/get_data/:user_id/:key", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
 		if userId == "" {

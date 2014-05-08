@@ -14,6 +14,15 @@ type MapBool struct {
 	lock    sync.RWMutex
 }
 
+func (self *MapBool) Array() []string {
+	arr := make([]string, 0, len(self.Map))
+	for str, _ := range self.Map {
+		arr = append(arr, str)
+	}
+
+	return arr
+}
+
 func (self *MapBool) Add(str string) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
