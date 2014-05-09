@@ -18,9 +18,6 @@ func (self *Clients) Get(id string) *Client {
 }
 
 func (self *Clients) Count() int {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	return len(self.Map)
 }
 

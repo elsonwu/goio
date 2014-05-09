@@ -10,9 +10,6 @@ type Rooms struct {
 }
 
 func (self *Rooms) Count() int {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	return len(self.Map)
 }
 

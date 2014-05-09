@@ -41,9 +41,6 @@ func (self *User) Receive(message *Message) {
 }
 
 func (self *User) Delete(id string) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	self.ClientIds.Delete(id)
 	if 0 == self.ClientIds.Count() {
 		if Debug {

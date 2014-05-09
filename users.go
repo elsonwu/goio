@@ -21,9 +21,6 @@ func (self *Users) Receive(message *Message) {
 }
 
 func (self *Users) Count() int {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	return len(self.Map)
 }
 

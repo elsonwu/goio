@@ -76,6 +76,10 @@ func main() {
 
 			return "ok"
 		})
+
+		m.Get("/count", func() string {
+			return fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
+		})
 	}
 
 	m.Get("/room_users/:room_id", func(params martini.Params, req *http.Request) (int, string) {
