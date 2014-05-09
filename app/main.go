@@ -59,6 +59,8 @@ func main() {
 
 	if *flagDebug {
 		m.Get("/test", func() string {
+
+			st := time.Now().Unix()
 			for i := 0; i < 10000; i++ {
 				userId := strconv.Itoa(i)
 				user := users.Get(userId)
@@ -74,7 +76,7 @@ func main() {
 				room.Add(user)
 			}
 
-			return "ok"
+			return strconv.Itoa(int(time.Now().Unix()-st)) + " seconds"
 		})
 	}
 
