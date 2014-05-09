@@ -148,7 +148,10 @@ func NewClient() (clt *Client, done chan bool) {
 			}
 
 			if !clt.IsLive() {
-				log.Printf("client id:%s destroy \n", clt.Id)
+				if Debug {
+					log.Printf("client id:%s destroy \n", clt.Id)
+				}
+
 				clt.Destroy()
 			}
 		}

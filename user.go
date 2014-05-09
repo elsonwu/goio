@@ -46,7 +46,10 @@ func (self *User) Delete(id string) {
 
 	self.ClientIds.Delete(id)
 	if 0 == self.ClientIds.Count() {
-		log.Println("user client count 0")
+		if Debug {
+			log.Println("user client count 0")
+		}
+
 		self.Destroy()
 	}
 }

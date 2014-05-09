@@ -27,11 +27,16 @@ func (self *Room) Receive(message *Message) {
 	}
 }
 
-func (self *Room) Delete(id string) {
-	self.UserIds.Delete(id)
+func (self *Room) Delete(userId string) {
+	self.UserIds.Delete(userId)
+	user := GlobalUsers().Get(userId)
+	if user != nil {
+		user.RoomIds.Delete(self.Id)
+	}
+
 	self.Receive(&Message{
 		EventName: "leave",
-		CallerId:  id,
+		CallerId:  userId,
 		RoomId:    self.Id,
 	})
 
