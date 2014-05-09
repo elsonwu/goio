@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/elsonwu/goio"
@@ -194,13 +195,13 @@ func main() {
 		timeNow := time.Now().Unix()
 		for {
 			if 0 < len(clt.Messages) {
-				val := ""
-				for _, msg := range clt.Messages {
-					v := msg.EventName + "|" + msg.RoomId + "|" + msg.CallerId + "|" + msg.Data
-					val += (v + "\n")
+				msgs, err := json.Marshal(clt.Messages)
+				if err != nil {
+					return 500, err.Error()
 				}
+
 				clt.CleanMessages()
-				return 200, val
+				return 200, string(msgs)
 			}
 
 			if time.Now().Unix() > timeNow+*flagClientMessageTimeout {
@@ -228,25 +229,11 @@ func main() {
 		clt.Handshake()
 		// we handshake again after it finished no matter timeout or ok
 		defer clt.Handshake()
-
-		message := &goio.Message{}
 		defer req.Body.Close()
 
-		//<event name>|<room id>|<user id>|<data>
-		//when post, we skip user id
-		val, _ := ioutil.ReadAll(req.Body)
-		msg := strings.SplitN(string(val), "|", 4)
-		message.EventName = msg[0]
+		message := &goio.Message{}
+		json.NewDecoder(req.Body).Decode(message)
 		message.CallerId = clt.UserId
-
-		if 2 <= len(msg) {
-			message.RoomId = msg[1]
-		}
-
-		if 4 <= len(msg) {
-			message.Data = msg[3]
-		}
-
 		go func(message *goio.Message) {
 			if *flagDebug {
 				log.Printf("post message: %#v", *message)
@@ -257,6 +244,8 @@ func main() {
 					EventName: "error",
 					Data:      "room id is missing",
 				})
+
+				return
 			}
 
 			// We change CallerId as current user
