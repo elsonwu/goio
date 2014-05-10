@@ -15,12 +15,16 @@ import (
 	"time"
 )
 
-var flagHost = flag.String("host", "127.0.0.1", "the server host")
-var flagPort = flag.String("port", "9999", "the server port")
+var flagHost = flag.String("host", "127.0.0.1:9999", "the default server host")
+var flagSSLHost = flag.String("sslhost", "", "the server host for https, it will override the host setting")
 var flagAllowOrigin = flag.String("alloworigin", "", "the host allow to cross site ajax")
 var flagDebug = flag.Bool("debug", false, "enable debug mode or not")
 var flagClientLifeCycle = flag.Int64("lifecycle", 30, "how many seconds of the client life cycle")
 var flagClientMessageTimeout = flag.Int64("messagetimeout", 15, "how many seconds of the client keep waiting for new messages")
+var flagEnableHttps = flag.Bool("enablehttps", false, "enable https or not")
+var flagDisableHttp = flag.Bool("disablehttp", false, "disable http and use https only")
+var flagCertFile = flag.String("certfile", "", "certificate file path")
+var flagKeyFile = flag.String("keyfile", "", "private file path")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -264,9 +268,35 @@ func main() {
 
 	m.Options("/.*", func(req *http.Request) {})
 
-	host := *flagHost + ":" + *flagPort
-	log.Println("Serve at " + host)
-	if err := http.ListenAndServe(host, m); err != nil {
-		log.Println(err)
+	host := *flagHost
+	if !*flagEnableHttps && *flagDisableHttp {
+		log.Fatalln("You cannot disable http but not enable https in the same time")
 	}
+
+	//Prevent exiting
+	ch := make(chan bool)
+
+	if !*flagDisableHttp {
+		go func() {
+			log.Println("Serve at " + host + " - http")
+			if err := http.ListenAndServe(host, m); err != nil {
+				log.Println(err)
+			}
+		}()
+	}
+
+	if *flagEnableHttps {
+		go func() {
+			if *flagSSLHost != "" {
+				host = *flagSSLHost
+			}
+
+			log.Println("Serve at " + host + " - https")
+			if err := http.ListenAndServeTLS(host, *flagCertFile, *flagKeyFile, m); err != nil {
+				log.Println(err)
+			}
+		}()
+	}
+
+	<-ch
 }
