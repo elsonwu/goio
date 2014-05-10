@@ -84,8 +84,33 @@ func main() {
 		})
 	}
 
-	m.Get("/count", func() string {
-		return fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
+	m.Get("/count", func(req *http.Request) string {
+		res := ""
+		res += fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
+
+		if "1" == req.URL.Query().Get("detail") {
+			res += fmt.Sprintf("-------------------------------\n")
+
+			for _, room := range rooms.Map {
+				res += fmt.Sprintf("# room id: %s \n", room.Id)
+				for userId, _ := range room.UserIds.Map {
+					res += fmt.Sprintf(" - user id: %s \n", userId)
+				}
+				res += fmt.Sprintf("\n")
+			}
+
+			res += fmt.Sprintf("-------------------------------\n")
+
+			for _, user := range users.Map {
+				res += fmt.Sprintf("# user id: %s \n", user.Id)
+				for clientId, _ := range user.ClientIds.Map {
+					res += fmt.Sprintf(" - client id: %s \n", clientId)
+				}
+				res += fmt.Sprintf("\n")
+			}
+		}
+
+		return res
 	})
 
 	m.Get("/room_users/:room_id", func(params martini.Params, req *http.Request) (int, string) {
