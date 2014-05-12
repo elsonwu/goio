@@ -57,7 +57,10 @@ func main() {
 		res.Header().Set("Access-Control-Allow-Credentials", "true")
 		res.Header().Set("Access-Control-Allow-Methods", "GET,POST")
 		if "" != *flagAllowOrigin {
-			res.Header().Set("Access-Control-Allow-Origin", *flagAllowOrigin)
+			allowOrigins := strings.Split(*flagAllowOrigin, ",")
+			for _, allowOrigin := range allowOrigins {
+				res.Header().Add("Access-Control-Allow-Origin", allowOrigin)
+			}
 		}
 	})
 
