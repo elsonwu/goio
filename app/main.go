@@ -246,7 +246,7 @@ func main() {
 				break
 			}
 
-			time.Sleep(1 * time.Second)
+			time.Sleep(100000 * time.Microsecond)
 		}
 
 		return 204, ""
