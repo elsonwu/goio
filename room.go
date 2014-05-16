@@ -1,14 +1,13 @@
 package goio
 
 import (
-	"sync"
+// "sync"
 )
 
 type Room struct {
 	Event
 	Id      string
 	UserIds MapBool
-	lock    sync.RWMutex
 }
 
 func (self *Room) Has(id string) bool {
@@ -16,14 +15,11 @@ func (self *Room) Has(id string) bool {
 }
 
 func (self *Room) Receive(message *Message) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-
-	for uid := range self.UserIds.Map {
+	self.UserIds.Each(func(uid string) {
 		if user := GlobalUsers().Get(uid); user != nil {
 			user.Receive(message)
 		}
-	}
+	})
 }
 
 func (self *Room) Delete(userId string) {

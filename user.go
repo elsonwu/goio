@@ -2,7 +2,7 @@ package goio
 
 import (
 	"log"
-	"sync"
+	// "sync"
 )
 
 type User struct {
@@ -11,7 +11,6 @@ type User struct {
 	ClientIds MapBool
 	RoomIds   MapBool
 	data      *TempData
-	lock      sync.RWMutex
 }
 
 func (self *User) Data() *TempData {
@@ -29,19 +28,16 @@ func (self *User) Receive(message *Message) {
 		return
 	}
 
-	self.ClientIds.lock.RLock()
-	defer self.ClientIds.lock.RUnlock()
-
-	for cltId := range self.ClientIds.Map {
-		clt := GlobalClients().Get(cltId)
-		if clt != nil {
+	self.ClientIds.Each(func(cltId string) {
+		if clt := GlobalClients().Get(cltId); clt != nil {
 			clt.Receive(message)
 		}
-	}
+	})
 }
 
 func (self *User) Delete(id string) {
 	self.ClientIds.Delete(id)
+
 	if 0 == self.ClientIds.Count() {
 		if Debug {
 			log.Println("user client count 0")

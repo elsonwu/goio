@@ -58,9 +58,6 @@ func (self *Users) Delete(userId string) {
 }
 
 func (self *Users) Get(userId string) *User {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-
 	if user, ok := self.Map[userId]; ok {
 		return user
 	}

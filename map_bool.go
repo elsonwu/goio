@@ -14,6 +14,12 @@ type MapBool struct {
 	lock    sync.RWMutex
 }
 
+func (self *MapBool) Each(callback func(string)) {
+	for str, _ := range self.Map {
+		callback(str)
+	}
+}
+
 func (self *MapBool) Array() []string {
 	arr := make([]string, 0, len(self.Map))
 

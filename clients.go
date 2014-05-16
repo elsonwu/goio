@@ -33,11 +33,11 @@ func (self *Clients) Add(clt *Client) {
 		return
 	}
 
-	self.lock.Lock()
-	defer self.lock.Unlock()
 	clt.On("destroy", func(message *Message) {
 		self.Delete(clt.Id)
 	})
 
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	self.Map[clt.Id] = clt
 }

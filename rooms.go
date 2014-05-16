@@ -44,10 +44,7 @@ func (self *Rooms) Has(id string) bool {
 }
 
 func (self *Rooms) Get(id string, autoNew bool) *Room {
-	self.lock.RLock()
 	room, ok := self.Map[id]
-	self.lock.RUnlock()
-
 	if ok {
 		return room
 	}
