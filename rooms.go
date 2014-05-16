@@ -25,33 +25,32 @@ func (self *Rooms) Add(room *Room) {
 		return
 	}
 
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	room.On("destroy", func(message *Message) {
 		self.Delete(room.Id)
 	})
+
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	self.Map[room.Id] = room
 }
 
 func (self *Rooms) Has(id string) bool {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 
 	_, ok := self.Map[id]
 	return ok
 }
 
 func (self *Rooms) Get(id string, autoNew bool) *Room {
-	self.lock.Lock()
+	self.lock.RLock()
+	room, ok := self.Map[id]
+	self.lock.RUnlock()
 
-	if room, ok := self.Map[id]; ok {
-		self.lock.Unlock()
+	if ok {
 		return room
 	}
-
-	self.lock.Unlock()
 
 	if autoNew {
 		return NewRoom(id)

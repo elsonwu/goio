@@ -29,8 +29,8 @@ func (self *User) Receive(message *Message) {
 		return
 	}
 
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.ClientIds.lock.RLock()
+	defer self.ClientIds.lock.RUnlock()
 
 	for cltId := range self.ClientIds.Map {
 		clt := GlobalClients().Get(cltId)

@@ -16,12 +16,11 @@ func (self *Room) Has(id string) bool {
 }
 
 func (self *Room) Receive(message *Message) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 
 	for uid := range self.UserIds.Map {
-		user := GlobalUsers().Get(uid)
-		if user != nil {
+		if user := GlobalUsers().Get(uid); user != nil {
 			user.Receive(message)
 		}
 	}

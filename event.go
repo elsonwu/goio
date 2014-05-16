@@ -27,14 +27,13 @@ func (self *Event) On(eventName string, fn callback) {
 }
 
 func (self *Event) Emit(eventName string, message *Message) {
-	self.lock.Lock()
-	if _, ok := self.evts[eventName]; !ok {
-		self.lock.Unlock()
+	self.lock.RLock()
+	evts, ok := self.evts[eventName]
+	self.lock.RUnlock()
+
+	if !ok {
 		return
 	}
-
-	evts := self.evts[eventName]
-	self.lock.Unlock()
 
 	for _, fn := range evts {
 		fn(message)

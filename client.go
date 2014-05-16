@@ -18,7 +18,6 @@ type Client struct {
 func (self *Client) CleanMessages() {
 	self.lock.Lock()
 	defer self.lock.Unlock()
-
 	//make a default cap value, it's enough for most use
 	self.Messages = make([]*Message, 0, 20)
 }
@@ -40,9 +39,6 @@ func (self *Client) Destroy() {
 }
 
 func (self *Client) Handshake() {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
 	self.LastHandshake = time.Now().Unix()
 }
 

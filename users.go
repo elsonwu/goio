@@ -10,8 +10,8 @@ type Users struct {
 }
 
 func (self *Users) Receive(message *Message) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 
 	for _, user := range self.Map {
 		if user != nil {
@@ -40,8 +40,9 @@ func (self *Users) Add(user *User) {
 	})
 
 	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	self.Map[user.Id] = user
-	self.lock.Unlock()
 }
 
 func (self *Users) Delete(userId string) {
@@ -57,8 +58,8 @@ func (self *Users) Delete(userId string) {
 }
 
 func (self *Users) Get(userId string) *User {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 
 	if user, ok := self.Map[userId]; ok {
 		return user
