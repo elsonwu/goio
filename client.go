@@ -19,7 +19,7 @@ func (self *Client) CleanMessages() {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	//make a default cap value, it's enough for most use
-	self.Messages = make([]*Message, 0, 10)
+	self.Messages = NewMessages()
 }
 
 func (self *Client) Receive(message *Message) {

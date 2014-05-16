@@ -114,6 +114,7 @@ func NewClients() []*Clients {
 func NewMClients() *MClients {
 	return &MClients{
 		clients: NewClients(),
+		max:     1000,
 	}
 }
 

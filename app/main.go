@@ -79,7 +79,7 @@ func main() {
 				user.Add(clt)
 				done <- true
 
-				room := rooms.Get(strconv.Itoa(i%100), true)
+				room := rooms.Get(strconv.Itoa(i%1000), true)
 				room.Add(user)
 			}
 
