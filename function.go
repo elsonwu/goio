@@ -9,29 +9,29 @@ import (
 var UuidLen int = 20
 var LifeCycle int64 = 60
 var Debug bool = false
-var GClients *Clients
-var GRooms *Rooms
-var GUsers *Users
+var GClients *MClients
+var GRooms *MRooms
+var GUsers *MUsers
 
-func GlobalClients() *Clients {
+func GlobalClients() *MClients {
 	if GClients == nil {
-		GClients = NewClients()
+		GClients = NewMClients()
 	}
 
 	return GClients
 }
 
-func GlobalRooms() *Rooms {
+func GlobalRooms() *MRooms {
 	if GRooms == nil {
-		GRooms = NewRooms()
+		GRooms = NewMRooms()
 	}
 
 	return GRooms
 }
 
-func GlobalUsers() *Users {
+func GlobalUsers() *MUsers {
 	if GUsers == nil {
-		GUsers = NewUsers()
+		GUsers = NewMUsers()
 	}
 
 	return GUsers
@@ -97,22 +97,38 @@ func NewRoom(id string) *Room {
 	return room
 }
 
-func NewUsers() *Users {
-	return &Users{
-		Map: make(map[string]*User),
+func NewUsers() []*Users {
+	return make([]*Users, 0, 10)
+}
+
+func NewMUsers() *MUsers {
+	return &MUsers{
+		users: NewUsers(),
 	}
 }
 
-func NewClients() *Clients {
-	return &Clients{
-		Map: make(map[string]*Client),
+func NewClients() []*Clients {
+	return make([]*Clients, 0, 10)
+}
+
+func NewMClients() *MClients {
+	return &MClients{
+		clients: NewClients(),
 	}
 }
 
-func NewRooms() *Rooms {
-	return &Rooms{
-		Map: make(map[string]*Room),
+func NewRooms() []*Rooms {
+	return make([]*Rooms, 0, 10)
+}
+
+func NewMRooms() *MRooms {
+	return &MRooms{
+		rooms: NewRooms(),
 	}
+}
+
+func NewMessages() []*Message {
+	return make([]*Message, 0, 20)
 }
 
 func Uuid() string {
@@ -122,7 +138,7 @@ func Uuid() string {
 func NewClient() (clt *Client, done chan bool) {
 	clt = &Client{
 		Id:            Uuid(),
-		Messages:      make([]*Message, 0, 20),
+		Messages:      NewMessages(),
 		LastHandshake: time.Now().Unix(),
 		LifeCycle:     LifeCycle,
 	}
