@@ -6,32 +6,32 @@ import (
 	"time"
 )
 
-var UuidLen int = 20
+var UuidLen int = 12
 var LifeCycle int64 = 60
 var Debug bool = false
-var GClients *Clients
-var GRooms *Rooms
-var GUsers *Users
+var GClients IClients
+var GRooms IRooms
+var GUsers IUsers
 
-func GlobalClients() *Clients {
+func GlobalClients() IClients {
 	if GClients == nil {
-		GClients = NewClients()
+		GClients = NewMClients()
 	}
 
 	return GClients
 }
 
-func GlobalRooms() *Rooms {
+func GlobalRooms() IRooms {
 	if GRooms == nil {
-		GRooms = NewRooms()
+		GRooms = NewMRooms()
 	}
 
 	return GRooms
 }
 
-func GlobalUsers() *Users {
+func GlobalUsers() IUsers {
 	if GUsers == nil {
-		GUsers = NewUsers()
+		GUsers = NewMUsers()
 	}
 
 	return GUsers
@@ -97,32 +97,60 @@ func NewRoom(id string) *Room {
 	return room
 }
 
-func NewUsers() *Users {
-	return &Users{
-		Map: make(map[string]*User),
+func NewUsers() []*Users {
+	return make([]*Users, 0, 10)
+}
+
+func NewMUsers() *MUsers {
+	return &MUsers{
+		Users: NewUsers(),
+		max:   1000,
 	}
 }
 
-func NewClients() *Clients {
-	return &Clients{
-		Map: make(map[string]*Client),
+func NewClients() []*Clients {
+	return make([]*Clients, 0, 10)
+}
+
+func NewMClients() *MClients {
+	return &MClients{
+		Clients: NewClients(),
+		max:     1000,
 	}
 }
 
-func NewRooms() *Rooms {
-	return &Rooms{
-		Map: make(map[string]*Room),
+func NewRooms() []*Rooms {
+	return make([]*Rooms, 0, 10)
+}
+
+func NewMRooms() *MRooms {
+	return &MRooms{
+		Rooms: NewRooms(),
+		max:   100,
 	}
+}
+
+func NewMessages() []*Message {
+	return make([]*Message, 0, 20)
 }
 
 func Uuid() string {
 	return random.String(UuidLen)
 }
 
+func NewClientId() string {
+	uuid := Uuid()
+	if GlobalClients().Get(uuid) != nil {
+		return NewClientId()
+	}
+
+	return uuid
+}
+
 func NewClient() (clt *Client, done chan bool) {
 	clt = &Client{
-		Id:            Uuid(),
-		Messages:      make([]*Message, 0, 20),
+		Id:            NewClientId(),
+		Messages:      NewMessages(),
 		LastHandshake: time.Now().Unix(),
 		LifeCycle:     LifeCycle,
 	}

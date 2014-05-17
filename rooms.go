@@ -9,6 +9,15 @@ type Rooms struct {
 	lock sync.RWMutex
 }
 
+func (self *Rooms) Each(callback func(*Room)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
+	for _, r := range self.Map {
+		callback(r)
+	}
+}
+
 func (self *Rooms) Count() int {
 	return len(self.Map)
 }

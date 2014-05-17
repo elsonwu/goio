@@ -79,7 +79,7 @@ func main() {
 				user.Add(clt)
 				done <- true
 
-				room := rooms.Get(strconv.Itoa(i%100), true)
+				room := rooms.Get(strconv.Itoa(i%1000), true)
 				room.Add(user)
 			}
 
@@ -94,23 +94,23 @@ func main() {
 		if "1" == req.URL.Query().Get("detail") {
 			res += fmt.Sprintf("-------------------------------\n")
 
-			for _, room := range rooms.Map {
+			rooms.Each(func(room *goio.Room) {
 				res += fmt.Sprintf("# room id: %s \n", room.Id)
 				for userId, _ := range room.UserIds.Map {
 					res += fmt.Sprintf(" - user id: %s \n", userId)
 				}
 				res += fmt.Sprintf("\n")
-			}
+			})
 
 			res += fmt.Sprintf("-------------------------------\n")
 
-			for _, user := range users.Map {
+			users.Each(func(user *goio.User) {
 				res += fmt.Sprintf("# user id: %s \n", user.Id)
 				for clientId, _ := range user.ClientIds.Map {
 					res += fmt.Sprintf(" - client id: %s \n", clientId)
 				}
 				res += fmt.Sprintf("\n")
-			}
+			})
 		}
 
 		return res

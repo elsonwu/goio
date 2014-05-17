@@ -9,6 +9,15 @@ type Clients struct {
 	lock sync.RWMutex
 }
 
+func (self *Clients) Each(callback func(*Client)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
+	for _, clt := range self.Map {
+		callback(clt)
+	}
+}
+
 func (self *Clients) Get(id string) *Client {
 	if clt, ok := self.Map[id]; ok {
 		return clt

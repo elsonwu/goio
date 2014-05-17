@@ -20,6 +20,15 @@ func (self *Users) Receive(message *Message) {
 	}
 }
 
+func (self *Users) Each(callback func(*User)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
+	for _, user := range self.Map {
+		callback(user)
+	}
+}
+
 func (self *Users) Count() int {
 	return len(self.Map)
 }
