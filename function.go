@@ -104,6 +104,7 @@ func NewUsers() []*Users {
 func NewMUsers() *MUsers {
 	return &MUsers{
 		Users: NewUsers(),
+		max:   1000,
 	}
 }
 
@@ -125,6 +126,7 @@ func NewRooms() []*Rooms {
 func NewMRooms() *MRooms {
 	return &MRooms{
 		Rooms: NewRooms(),
+		max:   100,
 	}
 }
 

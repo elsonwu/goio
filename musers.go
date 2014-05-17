@@ -3,6 +3,7 @@ package goio
 type MUsers struct {
 	Users   []*Users
 	current *Users
+	max     int
 }
 
 func (self *MUsers) Init() {
@@ -10,7 +11,7 @@ func (self *MUsers) Init() {
 		self.Users = NewUsers()
 	}
 
-	if self.current == nil || 1000 < self.current.Count() {
+	if self.current == nil || self.max < self.current.Count() {
 		self.current = &Users{
 			Map: make(map[string]*User),
 		}

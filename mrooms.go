@@ -3,6 +3,7 @@ package goio
 type MRooms struct {
 	Rooms   []*Rooms
 	current *Rooms
+	max     int
 }
 
 func (self *MRooms) Init() {
@@ -10,7 +11,7 @@ func (self *MRooms) Init() {
 		self.Rooms = NewRooms()
 	}
 
-	if self.current == nil || 100 < self.current.Count() {
+	if self.current == nil || self.max < self.current.Count() {
 		self.current = &Rooms{
 			Map: make(map[string]*Room),
 		}
