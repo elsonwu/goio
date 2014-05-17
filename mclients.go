@@ -19,6 +19,12 @@ func (self *MClients) Init() {
 	}
 }
 
+func (self *MClients) Each(callback func(*Client)) {
+	for _, cs := range self.Clients {
+		cs.Each(callback)
+	}
+}
+
 func (self *MClients) Get(id string) *Client {
 	for _, cs := range self.Clients {
 		if clt := cs.Get(id); clt != nil {

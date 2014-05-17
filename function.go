@@ -9,11 +9,11 @@ import (
 var UuidLen int = 12
 var LifeCycle int64 = 60
 var Debug bool = false
-var GClients *MClients
-var GRooms *MRooms
-var GUsers *MUsers
+var GClients IClients
+var GRooms IRooms
+var GUsers IUsers
 
-func GlobalClients() *MClients {
+func GlobalClients() IClients {
 	if GClients == nil {
 		GClients = NewMClients()
 	}
@@ -21,7 +21,7 @@ func GlobalClients() *MClients {
 	return GClients
 }
 
-func GlobalRooms() *MRooms {
+func GlobalRooms() IRooms {
 	if GRooms == nil {
 		GRooms = NewMRooms()
 	}
@@ -29,7 +29,7 @@ func GlobalRooms() *MRooms {
 	return GRooms
 }
 
-func GlobalUsers() *MUsers {
+func GlobalUsers() IUsers {
 	if GUsers == nil {
 		GUsers = NewMUsers()
 	}

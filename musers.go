@@ -19,6 +19,12 @@ func (self *MUsers) Init() {
 	}
 }
 
+func (self *MUsers) Each(callback func(*User)) {
+	for _, u := range self.Users {
+		u.Each(callback)
+	}
+}
+
 func (self *MUsers) Get(id string) *User {
 	for _, cs := range self.Users {
 		if clt := cs.Get(id); clt != nil {
