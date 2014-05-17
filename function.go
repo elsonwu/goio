@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-var UuidLen int = 20
+var UuidLen int = 12
 var LifeCycle int64 = 60
 var Debug bool = false
 var GClients *MClients
@@ -136,9 +136,18 @@ func Uuid() string {
 	return random.String(UuidLen)
 }
 
+func NewClientId() string {
+	uuid := Uuid()
+	if GlobalClients().Get(uuid) != nil {
+		return NewClientId()
+	}
+
+	return uuid
+}
+
 func NewClient() (clt *Client, done chan bool) {
 	clt = &Client{
-		Id:            Uuid(),
+		Id:            NewClientId(),
 		Messages:      NewMessages(),
 		LastHandshake: time.Now().Unix(),
 		LifeCycle:     LifeCycle,
