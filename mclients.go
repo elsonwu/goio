@@ -1,26 +1,26 @@
 package goio
 
 type MClients struct {
-	clients []*Clients
+	Clients []*Clients
 	current *Clients
 	max     int
 }
 
 func (self *MClients) Init() {
-	if self.current == nil || self.clients == nil {
-		self.clients = NewClients()
+	if self.current == nil || self.Clients == nil {
+		self.Clients = NewClients()
 	}
 
 	if self.current == nil || self.max < self.current.Count() {
 		self.current = &Clients{
 			Map: make(map[string]*Client),
 		}
-		self.clients = append(self.clients, self.current)
+		self.Clients = append(self.Clients, self.current)
 	}
 }
 
 func (self *MClients) Get(id string) *Client {
-	for _, cs := range self.clients {
+	for _, cs := range self.Clients {
 		if clt := cs.Get(id); clt != nil {
 			return clt
 		}
@@ -31,14 +31,14 @@ func (self *MClients) Get(id string) *Client {
 
 func (self *MClients) Count() int {
 	c := 0
-	for _, cs := range self.clients {
+	for _, cs := range self.Clients {
 		c += cs.Count()
 	}
 	return c
 }
 
 func (self *MClients) Delete(id string) {
-	for _, cs := range self.clients {
+	for _, cs := range self.Clients {
 		if clt := cs.Get(id); clt != nil {
 			cs.Delete(id)
 			return

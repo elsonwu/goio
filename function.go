@@ -103,7 +103,7 @@ func NewUsers() []*Users {
 
 func NewMUsers() *MUsers {
 	return &MUsers{
-		users: NewUsers(),
+		Users: NewUsers(),
 	}
 }
 
@@ -113,7 +113,7 @@ func NewClients() []*Clients {
 
 func NewMClients() *MClients {
 	return &MClients{
-		clients: NewClients(),
+		Clients: NewClients(),
 		max:     1000,
 	}
 }
@@ -124,7 +124,7 @@ func NewRooms() []*Rooms {
 
 func NewMRooms() *MRooms {
 	return &MRooms{
-		rooms: NewRooms(),
+		Rooms: NewRooms(),
 	}
 }
 
