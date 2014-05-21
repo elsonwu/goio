@@ -1,9 +1,14 @@
 package goio
 
+import (
+	"sync"
+)
+
 type MClients struct {
 	Clients []*Clients
 	current *Clients
 	max     int
+	lock    sync.RWMutex
 }
 
 func (self *MClients) Init() {
@@ -20,12 +25,18 @@ func (self *MClients) Init() {
 }
 
 func (self *MClients) Each(callback func(*Client)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Clients {
 		cs.Each(callback)
 	}
 }
 
 func (self *MClients) Get(id string) *Client {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Clients {
 		if clt := cs.Get(id); clt != nil {
 			return clt
@@ -36,6 +47,9 @@ func (self *MClients) Get(id string) *Client {
 }
 
 func (self *MClients) Count() int {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	c := 0
 	for _, cs := range self.Clients {
 		c += cs.Count()
@@ -44,6 +58,9 @@ func (self *MClients) Count() int {
 }
 
 func (self *MClients) Delete(id string) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Clients {
 		if clt := cs.Get(id); clt != nil {
 			cs.Delete(id)

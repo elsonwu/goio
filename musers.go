@@ -1,9 +1,14 @@
 package goio
 
+import (
+	"sync"
+)
+
 type MUsers struct {
 	Users   []*Users
 	current *Users
 	max     int
+	lock    sync.RWMutex
 }
 
 func (self *MUsers) Init() {
@@ -20,12 +25,18 @@ func (self *MUsers) Init() {
 }
 
 func (self *MUsers) Each(callback func(*User)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, u := range self.Users {
 		u.Each(callback)
 	}
 }
 
 func (self *MUsers) Get(id string) *User {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Users {
 		if clt := cs.Get(id); clt != nil {
 			return clt
@@ -36,6 +47,9 @@ func (self *MUsers) Get(id string) *User {
 }
 
 func (self *MUsers) Count() int {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	c := 0
 	for _, cs := range self.Users {
 		c += cs.Count()
@@ -44,6 +58,9 @@ func (self *MUsers) Count() int {
 }
 
 func (self *MUsers) Delete(id string) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Users {
 		if clt := cs.Get(id); clt != nil {
 			cs.Delete(id)

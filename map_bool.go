@@ -15,6 +15,9 @@ type MapBool struct {
 }
 
 func (self *MapBool) Each(callback func(string)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for str, _ := range self.Map {
 		callback(str)
 	}

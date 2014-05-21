@@ -1,9 +1,14 @@
 package goio
 
+import (
+	"sync"
+)
+
 type MRooms struct {
 	Rooms   []*Rooms
 	current *Rooms
 	max     int
+	lock    sync.RWMutex
 }
 
 func (self *MRooms) Init() {
@@ -20,12 +25,18 @@ func (self *MRooms) Init() {
 }
 
 func (self *MRooms) Each(callback func(r *Room)) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Rooms {
 		cs.Each(callback)
 	}
 }
 
 func (self *MRooms) Get(id string, autoNew bool) *Room {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Rooms {
 		if clt := cs.Get(id, false); clt != nil {
 			return clt
@@ -41,6 +52,9 @@ func (self *MRooms) Get(id string, autoNew bool) *Room {
 }
 
 func (self *MRooms) Count() int {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	c := 0
 	for _, cs := range self.Rooms {
 		c += cs.Count()
@@ -49,6 +63,9 @@ func (self *MRooms) Count() int {
 }
 
 func (self *MRooms) Delete(id string) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
 	for _, cs := range self.Rooms {
 		if cs.Has(id) {
 			cs.Delete(id)
