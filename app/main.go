@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/elsonwu/goio"
-	"github.com/go-martini/martini"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elsonwu/goio"
+	"github.com/go-martini/martini"
 )
 
 var flagHost = flag.String("host", "127.0.0.1:9999", "the default server host")
