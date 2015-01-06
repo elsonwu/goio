@@ -289,6 +289,7 @@ func main() {
 
 			// We change CallerId as current user
 			message.CallerId = user.Id
+			message.ClientId = clt.Id
 			user.Emit(message.EventName, message)
 		}(message)
 

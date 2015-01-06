@@ -22,13 +22,13 @@ func (self *User) Data() *TempData {
 }
 
 func (self *User) Receive(message *Message) {
-
-	// Don't send message to myself
-	if message != nil && message.CallerId == self.Id {
-		return
-	}
-
 	self.ClientIds.Each(func(cltId string) {
+
+		// don't send message to the client itself
+		if message.ClientId == cltId {
+			return
+		}
+
 		if clt := GlobalClients().Get(cltId); clt != nil {
 			clt.Receive(message)
 		}
