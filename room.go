@@ -1,13 +1,20 @@
 package goio
 
-import (
 // "sync"
-)
 
 type Room struct {
 	Event
 	Id      string
 	UserIds MapBool
+	data    *TempData
+}
+
+func (self *Room) Data() *TempData {
+	if self.data == nil {
+		self.data = &TempData{}
+	}
+
+	return self.data
 }
 
 func (self *Room) Has(id string) bool {
