@@ -135,50 +135,6 @@ func main() {
 	m.Get("/room_users/:room_id", getRoomUsersFn)
 	m.Get("/room/users/:room_id", getRoomUsersFn)
 
-	m.Get("/room/data/:room_id/:key", func(params martini.Params, req *http.Request) (int, string) {
-		roomId := params["room_id"]
-		if roomId == "" {
-			return 403, "room_id is missing"
-		}
-
-		key := params["key"]
-		if key == "" {
-			return 403, "key is missing"
-		}
-
-		room := rooms.Get(roomId, false)
-		if room == nil {
-			return 404, "room does not exist"
-		}
-
-		return 200, room.Data().Get(key)
-	})
-
-	m.Post("/room/data/:room_id/:key", func(params martini.Params, req *http.Request) (int, string) {
-		val, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			return 500, err.Error()
-		}
-
-		roomId := params["room_id"]
-		if roomId == "" {
-			return 403, "room_id is missing"
-		}
-
-		key := params["key"]
-		if key == "" {
-			return 403, "key is missing"
-		}
-
-		room := rooms.Get(roomId, false)
-		if room == nil {
-			return 404, "room does not exist"
-		}
-
-		room.Data().Set(key, string(val))
-		return 200, ""
-	})
-
 	getUserDataFn := func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
 		if userId == "" {
