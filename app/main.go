@@ -117,7 +117,7 @@ func main() {
 		return res
 	})
 
-	getRoomUsersFn := func(params martini.Params, req *http.Request) (int, string) {
+	m.Get("/room/users/:room_id", func(params martini.Params, req *http.Request) (int, string) {
 		roomId := params["room_id"]
 		if roomId == "" {
 			return 403, "room_id is missing"
@@ -129,13 +129,9 @@ func main() {
 		}
 
 		return 200, strings.Join(room.UserIds.Array(), ",")
-	}
+	})
 
-	// alias of /room/users, will be removed later
-	m.Get("/room_users/:room_id", getRoomUsersFn)
-	m.Get("/room/users/:room_id", getRoomUsersFn)
-
-	getUserDataFn := func(params martini.Params, req *http.Request) (int, string) {
+	m.Get("/user/data/:user_id/:key", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
 		if userId == "" {
 			return 403, "user_id is missing"
@@ -152,13 +148,9 @@ func main() {
 		}
 
 		return 200, user.Data().Get(key)
-	}
+	})
 
-	m.Get("/user/data/:user_id/:key", getUserDataFn)
-	// alias of /user/data, will be removed later
-	m.Get("/get_data/:user_id/:key", getUserDataFn)
-
-	setUserDataFn := func(params martini.Params, req *http.Request) (int, string) {
+	m.Post("/user/data/:client_id/:key", func(params martini.Params, req *http.Request) (int, string) {
 		val, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			return 500, err.Error()
@@ -183,11 +175,7 @@ func main() {
 		}
 
 		return 200, ""
-	}
-
-	m.Post("/user/data/:client_id/:key", setUserDataFn)
-	// alias of /user/data, will be removed later
-	m.Post("/set_data/:client_id/:key", setUserDataFn)
+	})
 
 	m.Post("/online_status", func(params martini.Params, req *http.Request) (int, string) {
 		val, err := ioutil.ReadAll(req.Body)
