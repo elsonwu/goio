@@ -47,7 +47,7 @@ func main() {
 	goji.Abandon(middleware.RequestID)
 	goji.Abandon(middleware.Logger)
 	goji.Use(func(h http.Handler) http.Handler {
-		fn := func(res http.ResponseWriter, req *http.Request) {
+		fn := func(res http.ResponseWriter, r *http.Request) {
 			res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			res.Header().Set("Access-Control-Allow-Credentials", "true")
 			res.Header().Set("Access-Control-Allow-Methods", "GET,POST")
@@ -58,14 +58,14 @@ func main() {
 				}
 			}
 			res.Header().Set("Content-Type", "text/plain")
-			h.ServeHTTP(res, req)
+			h.ServeHTTP(res, r)
 		}
 
 		return http.HandlerFunc(fn)
 	})
 
 	if *flagDebug {
-		goji.Get("/test", func(res http.ResponseWriter, req *http.Request) {
+		goji.Get("/test", func(w http.ResponseWriter, req *http.Request) {
 			st := time.Now().Unix()
 			for i := 0; i < 10000; i++ {
 				userId := strconv.Itoa(i)
@@ -82,109 +82,109 @@ func main() {
 				room.Add(user)
 			}
 
-			io.WriteString(res, strconv.Itoa(int(time.Now().Unix()-st))+" seconds")
+			io.WriteString(w, strconv.Itoa(int(time.Now().Unix()-st))+" seconds")
 		})
 	}
 
-	goji.Get("/count", func(res http.ResponseWriter, req *http.Request) {
-		str := ""
-		str += fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
+	goji.Get("/count", func(w http.ResponseWriter, req *http.Request) {
+		res := ""
+		res += fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", rooms.Count(), users.Count(), clients.Count())
 
 		if "1" == req.URL.Query().Get("detail") {
-			str += fmt.Sprintf("-------------------------------\n")
+			res += fmt.Sprintf("-------------------------------\n")
 
 			rooms.Each(func(room *goio.Room) {
-				str += fmt.Sprintf("# room id: %s \n", room.Id)
+				res += fmt.Sprintf("# room id: %s \n", room.Id)
 				for userId, _ := range room.UserIds.Map {
-					str += fmt.Sprintf(" - user id: %s \n", userId)
+					res += fmt.Sprintf(" - user id: %s \n", userId)
 				}
-				str += fmt.Sprintf("\n")
+				res += fmt.Sprintf("\n")
 			})
 
-			str += fmt.Sprintf("-------------------------------\n")
+			res += fmt.Sprintf("-------------------------------\n")
 
 			users.Each(func(user *goio.User) {
-				str += fmt.Sprintf("# user id: %s \n", user.Id)
+				res += fmt.Sprintf("# user id: %s \n", user.Id)
 				for clientId, _ := range user.ClientIds.Map {
-					str += fmt.Sprintf(" - client id: %s \n", clientId)
+					res += fmt.Sprintf(" - client id: %s \n", clientId)
 				}
-				str += fmt.Sprintf("\n")
+				res += fmt.Sprintf("\n")
 			})
 		}
 
-		io.WriteString(res, str)
+		io.WriteString(w, res)
 	})
 
-	goji.Get("/room/users/:room_id", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Get("/room/users/:room_id", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		roomId := ctx.URLParams["room_id"]
 		if roomId == "" {
-			http.Error(res, "room_id is missing", http.StatusForbidden)
+			http.Error(w, "room_id is missing", http.StatusForbidden)
 			return
 		}
 
 		room := rooms.Get(roomId, false)
 		if room == nil {
-			io.WriteString(res, "room does not exist")
+			io.WriteString(w, "room does not exist")
 			return
 		}
 
-		io.WriteString(res, strings.Join(room.UserIds.Array(), ","))
+		io.WriteString(w, strings.Join(room.UserIds.Array(), ","))
 	})
 
-	goji.Get("/room/users/:room_id", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Get("/room/users/:room_id", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		roomId := ctx.URLParams["room_id"]
 		if roomId == "" {
-			http.Error(res, "room_id is missing", http.StatusForbidden)
+			http.Error(w, "room_id is missing", http.StatusForbidden)
 			return
 		}
 
 		room := rooms.Get(roomId, false)
 		if room == nil {
-			io.WriteString(res, "")
+			io.WriteString(w, "")
 			return
 		}
 
-		io.WriteString(res, strings.Join(room.UserIds.Array(), ","))
+		io.WriteString(w, strings.Join(room.UserIds.Array(), ","))
 	})
 
-	goji.Get("/user/data/:user_id/:key", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Get("/user/data/:user_id/:key", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		userId := ctx.URLParams["user_id"]
 		if userId == "" {
-			http.Error(res, "user_id is missing", http.StatusForbidden)
+			http.Error(w, "user_id is missing", http.StatusForbidden)
 			return
 		}
 
 		key := ctx.URLParams["key"]
 		if key == "" {
-			http.Error(res, "key is missing", http.StatusForbidden)
+			http.Error(w, "key is missing", http.StatusForbidden)
 			return
 		}
 
 		user := users.Get(userId)
 		if user == nil {
-			io.WriteString(res, "")
+			io.WriteString(w, "")
 			return
 		}
 
-		io.WriteString(res, user.Data().Get(key))
+		io.WriteString(w, user.Data().Get(key))
 	})
 
-	goji.Post("/user/data/:client_id/:key", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Post("/user/data/:client_id/:key", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		val, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			http.Error(res, err.Error(), http.StatusForbidden)
+			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
 
 		clientId := ctx.URLParams["client_id"]
 		if clientId == "" {
-			http.Error(res, "client_id is missing", http.StatusForbidden)
+			http.Error(w, "client_id is missing", http.StatusForbidden)
 			return
 		}
 
 		key := ctx.URLParams["key"]
 		if key == "" {
-			http.Error(res, "key is missing", http.StatusForbidden)
+			http.Error(w, "key is missing", http.StatusForbidden)
 			return
 		}
 
@@ -196,13 +196,13 @@ func main() {
 			}
 		}
 
-		io.WriteString(res, "")
+		io.WriteString(w, "")
 	})
 
-	goji.Post("/online_status", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Post("/online_status", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		val, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			http.Error(res, err.Error(), http.StatusForbidden)
+			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
 
@@ -216,10 +216,10 @@ func main() {
 			}
 		}
 
-		io.WriteString(res, status)
+		io.WriteString(w, status)
 	})
 
-	goji.Post("/client/:user_id", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Post("/client/:user_id", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		userId := ctx.URLParams["user_id"]
 		user := users.Get(userId)
 		if user == nil {
@@ -230,24 +230,24 @@ func main() {
 		user.Add(clt)
 		done <- true
 
-		io.WriteString(res, clt.Id)
+		io.WriteString(w, clt.Id)
 	})
 
-	goji.Get("/kill_client/:client_id", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Get("/kill_client/:client_id", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		id := ctx.URLParams["client_id"]
 		clt := clients.Get(id)
 		if clt != nil {
 			clt.Destroy()
 		}
 
-		io.WriteString(res, "")
+		io.WriteString(w, "")
 	})
 
-	goji.Get("/message/:client_id", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Get("/message/:client_id", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		id := ctx.URLParams["client_id"]
 		clt := clients.Get(id)
 		if clt == nil {
-			http.Error(res, fmt.Sprintf("Client %s does not exist\n", id), http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("Client %s does not exist\n", id), http.StatusNotFound)
 			return
 		}
 
@@ -260,12 +260,12 @@ func main() {
 			if 0 < len(clt.Messages) {
 				msgs, err := json.Marshal(clt.Messages)
 				if err != nil {
-					http.Error(res, err.Error(), http.StatusInternalServerError)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 
 				clt.CleanMessages()
-				io.WriteString(res, string(msgs))
+				io.WriteString(w, string(msgs))
 				return
 			}
 
@@ -276,20 +276,20 @@ func main() {
 			time.Sleep(100000 * time.Microsecond)
 		}
 
-		io.WriteString(res, "")
+		io.WriteString(w, "")
 	})
 
-	goji.Post("/message/:client_id", func(ctx web.C, res http.ResponseWriter, req *http.Request) {
+	goji.Post("/message/:client_id", func(ctx web.C, w http.ResponseWriter, req *http.Request) {
 		id := ctx.URLParams["client_id"]
 		clt := clients.Get(id)
 		if clt == nil {
-			http.Error(res, fmt.Sprintf("Client %s does not exist\n", id), http.StatusForbidden)
+			http.Error(w, fmt.Sprintf("Client %s does not exist\n", id), http.StatusForbidden)
 			return
 		}
 
 		user := users.Get(clt.UserId)
 		if user == nil {
-			http.Error(res, fmt.Sprintf("Client %s does not connect with any user\n", id), http.StatusForbidden)
+			http.Error(w, fmt.Sprintf("Client %s does not connect with any user\n", id), http.StatusForbidden)
 			return
 		}
 
@@ -321,7 +321,7 @@ func main() {
 			user.Emit(message.EventName, message)
 		}(message)
 
-		io.WriteString(res, "")
+		io.WriteString(w, "")
 	})
 
 	goji.Serve()
