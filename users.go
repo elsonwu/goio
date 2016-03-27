@@ -1,75 +1,61 @@
 package goio
 
-import (
-	"sync"
-)
+import "sync"
 
-type Users struct {
-	Map  map[string]*User
-	lock sync.RWMutex
-}
+func NewUsers() *users {
+	us := new(users)
+	us.Users = make(map[string]*User)
+	us.AddUser = make(chan *User)
+	us.DelUser = make(chan *User)
 
-func (self *Users) Receive(message *Message) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
+	us.getUser = make(chan string)
+	us.user = make(chan *User)
 
-	for _, user := range self.Map {
-		if user != nil {
-			user.Receive(message)
+	us.getCount = make(chan struct{})
+	us.count = make(chan int)
+
+	go func(us *users) {
+		for {
+			select {
+			case u := <-us.AddUser:
+				us.Users[u.Id] = u
+
+			case u := <-us.DelUser:
+				delete(us.Users, u.Id)
+
+			case userId := <-us.getUser:
+				user, _ := us.Users[userId]
+				us.user <- user
+
+			case <-us.getCount:
+				us.count <- len(us.Users)
+			}
 		}
-	}
+
+	}(us)
+
+	return us
 }
 
-func (self *Users) Each(callback func(*User)) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
+type users struct {
+	Users   map[string]*User
+	AddUser chan *User
+	DelUser chan *User
 
-	for _, user := range self.Map {
-		callback(user)
-	}
+	getUser chan string
+	user    chan *User // after GetUser
+
+	getCount chan struct{}
+	count    chan int
+	lock     sync.RWMutex
 }
 
-func (self *Users) Count() int {
-	return len(self.Map)
+func (r *users) Count() int {
+	r.getCount <- struct{}{}
+	return <-r.count
 }
 
-func (self *Users) Add(user *User) {
-	if nil != self.Get(user.Id) {
-		return
-	}
-
-	user.On("destroy", func(message *Message) {
-		self.Delete(user.Id)
-	})
-
-	// send global message to all members
-	self.Receive(&Message{
-		EventName: "join",
-		CallerId:  user.Id,
-	})
-
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	self.Map[user.Id] = user
-}
-
-func (self *Users) Delete(userId string) {
-	self.lock.Lock()
-	delete(self.Map, userId)
-	self.lock.Unlock()
-
-	// send global message to all members
-	self.Receive(&Message{
-		EventName: "leave",
-		CallerId:  userId,
-	})
-}
-
-func (self *Users) Get(userId string) *User {
-	if user, ok := self.Map[userId]; ok {
-		return user
-	}
-
-	return nil
+func (r *users) Get(userId string) *User {
+	r.getUser <- userId
+	return <-r.user
 }

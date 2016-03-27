@@ -1,66 +1,60 @@
 package goio
 
-import (
-	"sync"
-)
+import "sync"
 
-type Rooms struct {
-	Map  map[string]*Room
-	lock sync.RWMutex
+func NewRooms() *rooms {
+	rs := new(rooms)
+	rs.Rooms = make(map[string]*Room)
+	rs.AddRoom = make(chan *Room)
+	rs.DelRoom = make(chan *Room)
+
+	rs.getRoom = make(chan string)
+	rs.room = make(chan *Room)
+
+	rs.getCount = make(chan struct{})
+	rs.count = make(chan int)
+
+	go func(rs *rooms) {
+		for {
+			select {
+			case r := <-rs.AddRoom:
+				rs.Rooms[r.Id] = r
+
+			case r := <-rs.DelRoom:
+				delete(rs.Rooms, r.Id)
+
+			case roomId := <-rs.getRoom:
+				room, _ := rs.Rooms[roomId]
+				rs.room <- room
+
+			case <-rs.getCount:
+				rs.count <- len(rs.Rooms)
+			}
+		}
+
+	}(rs)
+
+	return rs
 }
 
-func (self *Rooms) Each(callback func(*Room)) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
+type rooms struct {
+	Rooms   map[string]*Room
+	AddRoom chan *Room
+	DelRoom chan *Room
+	room    chan *Room
+	getRoom chan string
 
-	for _, r := range self.Map {
-		callback(r)
-	}
+	count    chan int
+	getCount chan struct{}
+	lock     sync.RWMutex
 }
 
-func (self *Rooms) Count() int {
-	return len(self.Map)
+func (r *rooms) Count() int {
+	r.getCount <- struct{}{}
+	return <-r.count
 }
 
-func (self *Rooms) Delete(id string) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	delete(self.Map, id)
-}
-
-func (self *Rooms) Add(room *Room) {
-	if self.Has(room.Id) {
-		return
-	}
-
-	room.On("destroy", func(message *Message) {
-		self.Delete(room.Id)
-	})
-
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	self.Map[room.Id] = room
-}
-
-func (self *Rooms) Has(id string) bool {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-
-	_, ok := self.Map[id]
-	return ok
-}
-
-func (self *Rooms) Get(id string, autoNew bool) *Room {
-	room, ok := self.Map[id]
-	if ok {
-		return room
-	}
-
-	if autoNew {
-		return NewRoom(id)
-	}
-
-	return nil
+func (r *rooms) Get(roomId string) *Room {
+	r.getRoom <- roomId
+	return <-r.room
 }

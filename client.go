@@ -3,54 +3,53 @@ package goio
 import (
 	"sync"
 	"time"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
+func NewClientId() string {
+	return bson.NewObjectId().Hex()
+}
+
+func NewClient(user *User) *Client {
+	clt := &Client{
+		Id:            NewClientId(),
+		User:          user,
+		Message:       make(chan *Message),
+		LastHandshake: time.Now().Unix(),
+	}
+
+	go func() {
+		for {
+			select {
+			case msg := <-clt.Message:
+				// send message to the same user but other client
+				clt.User.Message <- msg
+
+			case <-time.After(10 * time.Second):
+				// timeout
+				close(clt.Message)
+
+				clt.User.DelClt <- clt
+				Clients().DelClt <- clt
+				// stop this loop
+				return
+			}
+		}
+	}()
+
+	return clt
+}
+
 type Client struct {
-	Event
 	Id            string
-	UserId        string
-	Messages      []*Message
+	User          *User
+	Message       chan *Message
 	LastHandshake int64
 	LifeCycle     int64
 	lock          sync.RWMutex
 }
 
-func (self *Client) CleanMessages() {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-	//make a default cap value, it's enough for most use
-	self.Messages = NewMessages()
-}
-
-func (self *Client) Receive(message *Message) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	// if there are too many messages, we limit the max to 80
-	if len(self.Messages) >= 80 {
-		self.Messages = self.Messages[1:]
-	}
-
-	self.Messages = append(self.Messages, message)
-}
-
-func (self *Client) Destroy() {
-	self.Emit("destroy", nil)
-}
-
 func (self *Client) Handshake() {
 	self.LastHandshake = time.Now().Unix()
-}
-
-func (self *Client) LifeRemain() int64 {
-	remain := self.LifeCycle - (time.Now().Unix() - self.LastHandshake)
-	if 0 >= remain {
-		return 0
-	}
-
-	return remain
-}
-
-func (self *Client) IsLive() bool {
-	return 0 < self.LifeRemain()
 }

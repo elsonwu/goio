@@ -1,65 +1,70 @@
 package goio
 
-import (
-	"log"
-	// "sync"
-)
+func NewUser(userId string) *User {
+	user := &User{
+		Id:      userId,
+		Clients: make(map[string]*Client),
+		Rooms:   make(map[string]*Room),
+		Message: make(chan *Message),
+		AddClt:  make(chan *Client),
+		DelClt:  make(chan *Client),
+		AddRoom: make(chan *Room),
+	}
+
+	go func(user *User) {
+		for {
+			select {
+			case msg := <-user.Message:
+				for _, c := range user.Clients {
+					if c.Id == msg.ClientId {
+						continue
+					}
+
+					go func(c *Client, msg *Message) {
+						c.Message <- msg
+					}(c, msg)
+				}
+
+			case clt := <-user.AddClt:
+				user.Clients[clt.Id] = clt
+
+			case clt := <-user.DelClt:
+				delete(user.Clients, clt.Id)
+
+				if len(user.Clients) == 0 {
+					close(user.AddClt)
+					close(user.DelClt)
+					close(user.Message)
+					close(user.AddRoom)
+
+					Users().DelUser <- user
+
+					for _, r := range user.Rooms {
+						r.DelUser <- user
+					}
+
+					user.Rooms = nil
+
+					// break this loop
+					return
+				}
+
+			case room := <-user.AddRoom:
+				user.Rooms[room.Id] = room
+			}
+		}
+
+	}(user)
+
+	return user
+}
 
 type User struct {
-	Event
-	Id        string
-	ClientIds MapBool
-	RoomIds   MapBool
-	data      *TempData
-}
-
-func (self *User) Data() *TempData {
-	if self.data == nil {
-		self.data = &TempData{}
-	}
-
-	return self.data
-}
-
-func (self *User) Receive(message *Message) {
-	self.ClientIds.Each(func(cltId string) {
-
-		// don't send message to the client itself
-		if message.ClientId == cltId {
-			return
-		}
-
-		if clt := GlobalClients().Get(cltId); clt != nil {
-			clt.Receive(message)
-		}
-	})
-}
-
-func (self *User) Delete(id string) {
-	self.ClientIds.Delete(id)
-
-	if 0 == self.ClientIds.Count() {
-		if Debug {
-			log.Println("user client count 0")
-		}
-
-		self.Destroy()
-	}
-}
-
-func (self *User) Destroy() {
-	self.Emit("destroy", nil)
-}
-
-func (self *User) Add(clt *Client) {
-	if self.ClientIds.Has(clt.Id) {
-		return
-	}
-
-	clt.On("destroy", func(message *Message) {
-		self.Delete(clt.Id)
-	})
-
-	clt.UserId = self.Id
-	self.ClientIds.Add(clt.Id)
+	Id      string
+	Clients map[string]*Client
+	Rooms   map[string]*Room
+	Message chan *Message
+	AddClt  chan *Client
+	DelClt  chan *Client
+	AddRoom chan *Room
 }

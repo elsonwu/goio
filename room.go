@@ -1,71 +1,75 @@
 package goio
 
-// "sync"
+import (
+	"fmt"
+	"sync"
+)
+
+func NewRoom(roomId string) *Room {
+	room := &Room{
+		Id:      roomId,
+		Users:   make(map[string]*User),
+		AddUser: make(chan *User),
+		DelUser: make(chan *User),
+		Message: make(chan *Message),
+	}
+
+	go func(room *Room) {
+		for {
+			select {
+			case u := <-room.AddUser:
+				room.Users[u.Id] = u
+
+				u.AddRoom <- room
+
+			case u := <-room.DelUser:
+				delete(room.Users, u.Id)
+
+				fmt.Println("room del user")
+
+				if len(room.Users) == 0 {
+					close(room.AddUser)
+					close(room.DelUser)
+					close(room.Message)
+					room.Users = nil
+
+					Rooms().DelRoom <- room
+
+					//stop this loop
+					return
+				}
+
+			case msg := <-room.Message:
+				for _, u := range room.Users {
+					go func(u *User, msg *Message) {
+						u.Message <- msg
+					}(u, msg)
+				}
+			}
+		}
+
+	}(room)
+
+	return room
+}
 
 type Room struct {
-	Event
 	Id      string
-	UserIds MapBool
-	data    *TempData
+	Users   map[string]*User
+	AddUser chan *User
+	DelUser chan *User
+	Message chan *Message
+	lock    sync.RWMutex
 }
 
-func (self *Room) Data() *TempData {
-	if self.data == nil {
-		self.data = &TempData{}
+func (r *Room) UserIds() []string {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	uids := make([]string, 0, len(r.Users))
+	for _, u := range r.Users {
+		uids = append(uids, u.Id)
 	}
 
-	return self.data
-}
-
-func (self *Room) Has(id string) bool {
-	return self.UserIds.Has(id)
-}
-
-func (self *Room) Receive(message *Message) {
-	self.UserIds.Each(func(uid string) {
-		if user := GlobalUsers().Get(uid); user != nil {
-			user.Receive(message)
-		}
-	})
-}
-
-func (self *Room) Delete(userId string) {
-	self.UserIds.Delete(userId)
-	user := GlobalUsers().Get(userId)
-	if user != nil {
-		user.RoomIds.Delete(self.Id)
-	}
-
-	self.Receive(&Message{
-		EventName: "leave",
-		CallerId:  userId,
-		RoomId:    self.Id,
-	})
-
-	if 0 == self.UserIds.Count() {
-		self.Destroy()
-	}
-}
-
-func (self *Room) Destroy() {
-	self.Emit("destroy", nil)
-}
-
-func (self *Room) Add(user *User) {
-	if self.Has(user.Id) {
-		return
-	}
-
-	self.Receive(&Message{
-		EventName: "join",
-		RoomId:    self.Id,
-		CallerId:  user.Id,
-	})
-
-	user.On("destroy", func(message *Message) {
-		self.Delete(user.Id)
-	})
-
-	user.RoomIds.Add(self.Id)
-	self.UserIds.Add(user.Id)
+	return uids
 }
