@@ -9,6 +9,10 @@ func NewUser(userId string) *User {
 		AddClt:  make(chan *Client),
 		DelClt:  make(chan *Client),
 		AddRoom: make(chan *Room),
+		dataMap: make(map[string]string),
+		data:    make(chan string),
+		AddData: make(chan UserData),
+		getData: make(chan string),
 	}
 
 	go func(user *User) {
@@ -36,6 +40,9 @@ func NewUser(userId string) *User {
 					close(user.DelClt)
 					close(user.Message)
 					close(user.AddRoom)
+					close(user.AddData)
+					close(user.data)
+					close(user.getData)
 
 					Users().DelUser <- user
 
@@ -43,7 +50,9 @@ func NewUser(userId string) *User {
 						r.DelUser <- user
 					}
 
+					user.Clients = nil
 					user.Rooms = nil
+					user.dataMap = nil
 
 					// break this loop
 					return
@@ -51,7 +60,15 @@ func NewUser(userId string) *User {
 
 			case room := <-user.AddRoom:
 				user.Rooms[room.Id] = room
+
+			case key := <-user.getData:
+				user.data <- user.dataMap[key]
+
+			case userData := <-user.AddData:
+				user.dataMap[userData.Key] = userData.Val
+
 			}
+
 		}
 
 	}(user)
@@ -67,4 +84,13 @@ type User struct {
 	AddClt  chan *Client
 	DelClt  chan *Client
 	AddRoom chan *Room
+	AddData chan UserData
+	data    chan string
+	getData chan string
+	dataMap map[string]string
+}
+
+func (u *User) GetData(key string) string {
+	u.getData <- key
+	return <-u.data
 }

@@ -118,34 +118,34 @@ func main() {
 		return 200, strings.Join(room.UserIds(), ",")
 	})
 
-	// m.Get("/user/data/:user_id/:key", func(params martini.Params, req *http.Request) (int, string) {
-	// userId := params["user_id"]
-	// key := params["key"]
+	m.Get("/user/data/:user_id/:key", func(params martini.Params, req *http.Request) (int, string) {
+		userId := params["user_id"]
+		key := params["key"]
 
-	// user := goio.Users().Get(userId)
-	// if user == nil {
-	// return 200, ""
-	// }
+		user := goio.Users().Get(userId)
+		if user == nil {
+			return 200, ""
+		}
 
-	// return 200, user.Data().Get(key)
-	// })
+		return 200, user.GetData(key)
+	})
 
-	// m.Post("/user/data/:client_id/:key", func(params martini.Params, req *http.Request) (int, string) {
-	// val, err := ioutil.ReadAll(req.Body)
-	// if err != nil {
-	// return 500, err.Error()
-	// }
+	m.Post("/user/data/:client_id/:key", func(params martini.Params, req *http.Request) (int, string) {
+		val, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			return 500, err.Error()
+		}
 
-	// clientId := params["client_id"]
-	// key := params["key"]
+		clientId := params["client_id"]
+		key := params["key"]
 
-	// clt := clients.Get(clientId)
-	// if clt != nil && clt.User != nil {
-	// clt.User.Data().Set(key, string(val))
-	// }
+		clt := goio.Clients().Get(clientId)
+		if clt != nil && clt.User != nil {
+			clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}
+		}
 
-	// return 200, ""
-	// })
+		return 200, ""
+	})
 
 	m.Post("/online_status", func(params martini.Params, req *http.Request) (int, string) {
 		val, err := ioutil.ReadAll(req.Body)
@@ -171,9 +171,12 @@ func main() {
 		user := goio.Users().Get(userId)
 		if user == nil {
 			user = goio.NewUser(userId)
+			goio.Users().AddUser <- user
 		}
 
 		clt := goio.NewClient(user)
+		goio.Clients().AddClt <- clt
+
 		return 200, clt.Id
 	})
 
