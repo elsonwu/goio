@@ -2,6 +2,9 @@ package goio
 
 import "sync"
 
+// for client life cycle, default 30s
+var LifeCycle int64 = 30
+
 var _us *users
 var _rs *rooms
 var _cs *clients

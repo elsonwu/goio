@@ -16,27 +16,30 @@ func NewClient(user *User) *Client {
 		Id:            NewClientId(),
 		User:          user,
 		Message:       make(chan *Message),
-		LastHandshake: time.Now().Unix(),
+		lastHandshake: time.Now().Unix(),
 	}
 
-	go func() {
+	go func(clt *Client) {
 		for {
 			select {
 			case msg := <-clt.Message:
 				// send message to the same user but other client
 				clt.User.Message <- msg
 
-			case <-time.After(10 * time.Second):
-				// timeout
-				close(clt.Message)
+			case <-time.After(time.Duration(LifeCycle) * time.Second):
 
-				clt.User.DelClt <- clt
-				Clients().DelClt <- clt
-				// stop this loop
-				return
+				// timeout, kill this client
+				if time.Now().Unix()-clt.lastHandshake >= LifeCycle {
+					close(clt.Message)
+
+					clt.User.DelClt <- clt
+					Clients().DelClt <- clt
+					// stop this loop
+					return
+				}
 			}
 		}
-	}()
+	}(clt)
 
 	return clt
 }
@@ -45,11 +48,10 @@ type Client struct {
 	Id            string
 	User          *User
 	Message       chan *Message
-	LastHandshake int64
-	LifeCycle     int64
+	lastHandshake int64
 	lock          sync.RWMutex
 }
 
 func (self *Client) Handshake() {
-	self.LastHandshake = time.Now().Unix()
+	self.lastHandshake = time.Now().Unix()
 }

@@ -41,6 +41,8 @@ func main() {
 		}()
 	}
 
+	goio.LifeCycle = *flagClientLifeCycle
+
 	martini.Env = martini.Dev
 	router := martini.NewRouter()
 	mart := martini.New()
@@ -104,6 +106,7 @@ func main() {
 		return fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count())
 	})
 
+	// get user ids array from the given room
 	m.Get("/room/users/:room_id", func(params martini.Params, req *http.Request) (int, string) {
 		roomId := params["room_id"]
 
@@ -178,6 +181,7 @@ func main() {
 
 		clt := goio.Clients().Get(params["client_id"])
 		if clt != nil {
+			clt.User.DelClt <- clt
 			goio.Clients().DelClt <- clt
 		}
 

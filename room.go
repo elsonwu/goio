@@ -1,9 +1,6 @@
 package goio
 
-import (
-	"fmt"
-	"sync"
-)
+import "sync"
 
 func NewRoom(roomId string) *Room {
 	room := &Room{
@@ -12,6 +9,9 @@ func NewRoom(roomId string) *Room {
 		AddUser: make(chan *User),
 		DelUser: make(chan *User),
 		Message: make(chan *Message),
+
+		getUserIds: make(chan struct{}),
+		userIds:    make(chan []string),
 	}
 
 	go func(room *Room) {
@@ -25,12 +25,12 @@ func NewRoom(roomId string) *Room {
 			case u := <-room.DelUser:
 				delete(room.Users, u.Id)
 
-				fmt.Println("room del user")
-
 				if len(room.Users) == 0 {
 					close(room.AddUser)
 					close(room.DelUser)
 					close(room.Message)
+					close(room.getUserIds)
+					close(room.userIds)
 					room.Users = nil
 
 					Rooms().DelRoom <- room
@@ -45,6 +45,14 @@ func NewRoom(roomId string) *Room {
 						u.Message <- msg
 					}(u, msg)
 				}
+
+			case <-room.getUserIds:
+				uids := make([]string, 0, len(room.Users))
+				for _, u := range room.Users {
+					uids = append(uids, u.Id)
+				}
+
+				room.userIds <- uids
 			}
 		}
 
@@ -54,22 +62,17 @@ func NewRoom(roomId string) *Room {
 }
 
 type Room struct {
-	Id      string
-	Users   map[string]*User
-	AddUser chan *User
-	DelUser chan *User
-	Message chan *Message
-	lock    sync.RWMutex
+	Id         string
+	Users      map[string]*User
+	AddUser    chan *User
+	DelUser    chan *User
+	getUserIds chan struct{}
+	userIds    chan []string
+	Message    chan *Message
+	lock       sync.RWMutex
 }
 
 func (r *Room) UserIds() []string {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-
-	uids := make([]string, 0, len(r.Users))
-	for _, u := range r.Users {
-		uids = append(uids, u.Id)
-	}
-
-	return uids
+	r.getUserIds <- struct{}{}
+	return <-r.userIds
 }
