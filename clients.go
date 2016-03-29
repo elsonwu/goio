@@ -6,8 +6,8 @@ func NewClients() *clients {
 	clts := new(clients)
 	clts.Clients = make(map[string]*Client)
 	clts.Message = make(chan *Message)
-	clts.AddClt = make(chan *Client)
-	clts.DelClt = make(chan *Client)
+	clts.addClt = make(chan *Client)
+	clts.delClt = make(chan *Client)
 
 	clts.clt = make(chan *Client)
 	clts.getClt = make(chan string)
@@ -18,10 +18,10 @@ func NewClients() *clients {
 	go func(clts *clients) {
 		for {
 			select {
-			case c := <-clts.AddClt:
+			case c := <-clts.addClt:
 				clts.Clients[c.Id] = c
 
-			case c := <-clts.DelClt:
+			case c := <-clts.delClt:
 				delete(clts.Clients, c.Id)
 
 			case clientId := <-clts.getClt:
@@ -41,8 +41,8 @@ func NewClients() *clients {
 type clients struct {
 	Clients map[string]*Client
 	Message chan *Message
-	AddClt  chan *Client
-	DelClt  chan *Client
+	addClt  chan *Client
+	delClt  chan *Client
 
 	clt    chan *Client
 	getClt chan string

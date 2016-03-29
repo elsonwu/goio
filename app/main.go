@@ -18,7 +18,7 @@ import (
 
 var flagHost = flag.String("host", "127.0.0.1:9999", "the default server host")
 var flagSSLHost = flag.String("sslhost", "", "the server host for https, it will override the host setting")
-var flagAllowOrigin = flag.String("alloworigin", "", "the host allow to cross site ajax")
+var flagAllowOrigin = flag.String("alloworigin", "*", "the host allow to cross site ajax")
 var flagDebug = flag.Bool("debug", false, "enable debug mode or not")
 var flagClientLifeCycle = flag.Int64("lifecycle", 30, "how many seconds of the client life cycle")
 var flagClientMessageTimeout = flag.Int64("messagetimeout", 15, "how many seconds of the client keep waiting for new messages")
@@ -53,6 +53,7 @@ func main() {
 		res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		res.Header().Set("Access-Control-Allow-Credentials", "true")
 		res.Header().Set("Access-Control-Allow-Methods", "GET,POST")
+		res.Header().Set("Powered-By", "Goio")
 		if "" != *flagAllowOrigin {
 			allowOrigins := strings.Split(*flagAllowOrigin, ",")
 			for _, allowOrigin := range allowOrigins {
@@ -62,7 +63,49 @@ func main() {
 	})
 
 	if *flagDebug {
-		m.Get("/test", func() string {
+
+		m.Get("/test/message", func() string {
+			userId1 := "u1"
+			user1 := goio.Users().MustGet(userId1)
+			clt1 := goio.NewClient(user1)
+
+			roomId := "r1"
+			room := goio.Rooms().Get(roomId)
+			if room == nil {
+				room = goio.NewRoom(roomId)
+			}
+
+			room.AddUser <- user1
+
+			go func(clt1 *goio.Client) {
+				for {
+					msgs := clt1.Msgs()
+					if len(msgs) == 0 {
+						time.Sleep(3 * time.Second)
+						continue
+					}
+
+					fmt.Printf("user %s clt %s received message %#v \n", clt1.User.Id, clt1.Id, msgs)
+				}
+			}(clt1)
+
+			userId2 := "u2"
+			user2 := goio.Users().MustGet(userId2)
+			clt2 := goio.NewClient(user2)
+
+			msg := &goio.Message{}
+			msg.CallerId = userId2
+			msg.ClientId = clt2.Id
+			msg.EventName = "join"
+			msg.RoomId = roomId
+			msg.Data = `{"val":"this is a test"}`
+
+			room.Message <- msg
+
+			return "completed"
+		})
+
+		m.Get("/test/client", func() string {
 
 			count := 10000
 			all := make(chan struct{}, count)
@@ -71,15 +114,9 @@ func main() {
 			for i := 1; i <= count; i++ {
 				go func(i int) {
 					userId := strconv.Itoa(i)
-					user := goio.Users().Get(userId)
-					if user == nil {
-						user = goio.NewUser(userId)
-					}
-					goio.Users().AddUser <- user
+					user := goio.Users().MustGet(userId)
 
-					clt := goio.NewClient(user)
-					user.AddClt <- clt
-					goio.Clients().AddClt <- clt
+					goio.NewClient(user)
 
 					roomId := strconv.Itoa(i % 1000)
 					room := goio.Rooms().Get(roomId)
@@ -88,7 +125,6 @@ func main() {
 					}
 
 					room.AddUser <- user
-					goio.Rooms().AddRoom <- room
 
 					all <- struct{}{}
 				}(i)
@@ -132,6 +168,8 @@ func main() {
 
 	m.Post("/user/data/:client_id/:key", func(params martini.Params, req *http.Request) (int, string) {
 		val, err := ioutil.ReadAll(req.Body)
+		req.Body.Close()
+
 		if err != nil {
 			return 500, err.Error()
 		}
@@ -149,11 +187,16 @@ func main() {
 
 	m.Post("/online_status", func(params martini.Params, req *http.Request) (int, string) {
 		val, err := ioutil.ReadAll(req.Body)
+		req.Body.Close()
+
 		if err != nil {
+			fmt.Printf("online_status error %s\n", err.Error())
 			return 500, err.Error()
 		}
 
 		userIds := strings.Split(string(val), ",")
+		fmt.Printf("checking userIds:%s\n", string(val))
+
 		status := ""
 		for _, userId := range userIds {
 			if nil == goio.Users().Get(userId) {
@@ -168,14 +211,8 @@ func main() {
 
 	m.Post("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
 		userId := params["user_id"]
-		user := goio.Users().Get(userId)
-		if user == nil {
-			user = goio.NewUser(userId)
-			goio.Users().AddUser <- user
-		}
-
+		user := goio.Users().MustGet(userId)
 		clt := goio.NewClient(user)
-		goio.Clients().AddClt <- clt
 
 		return 200, clt.Id
 	})
@@ -185,7 +222,6 @@ func main() {
 		clt := goio.Clients().Get(params["client_id"])
 		if clt != nil {
 			clt.User.DelClt <- clt
-			goio.Clients().DelClt <- clt
 		}
 
 		return 204, ""
@@ -203,11 +239,14 @@ func main() {
 		// we handshake again after it finished no matter timeout or ok
 		defer clt.Handshake()
 
-		select {
-		case <-time.After(time.Duration(*flagClientMessageTimeout) * time.Second):
-			return 204, ""
-		case msg := <-clt.Message:
-			m, err := json.Marshal(msg)
+		for {
+			msgs := clt.Msgs()
+			if len(msgs) == 0 {
+				time.Sleep(3 * time.Second)
+				continue
+			}
+
+			m, err := json.Marshal(msgs)
 			if err != nil {
 				return 500, err.Error()
 			}
@@ -227,83 +266,62 @@ func main() {
 			return 403, fmt.Sprintf("Client %s does not connect with any user\n", id)
 		}
 
-		defer req.Body.Close()
+		msg := &goio.Message{}
+		json.NewDecoder(req.Body).Decode(msg)
+		req.Body.Close()
 
-		message := &goio.Message{}
-		json.NewDecoder(req.Body).Decode(message)
-		message.CallerId = clt.User.Id
+		msg.CallerId = clt.User.Id
+		msg.ClientId = clt.Id
 
-		go func(message *goio.Message, clt *goio.Client) {
+		go func(msg *goio.Message, clt *goio.Client) {
 			if *flagDebug {
-				log.Printf("post message: %#v", *message)
+				log.Printf("post msg: %#v\n", *msg)
 			}
 
-			// We change CallerId as current user
-			message.CallerId = clt.User.Id
-			message.ClientId = clt.Id
-			switch message.EventName {
-			case "broadcast":
-				if message.RoomId == "" {
-					room := goio.Rooms().Get(message.RoomId)
-					if room == nil {
-						clt.Message <- &goio.Message{
-							EventName: "error",
-							Data:      "room id is invalid",
-						}
+			fmt.Println("user send msg - begin")
 
-						return
-					}
-
-					room.Message <- message
-				} else {
-					goio.Clients().Message <- message
-				}
-
+			switch msg.EventName {
 			case "join":
-				if message.RoomId == "" {
-					clt.Message <- &goio.Message{
-						EventName: "error",
-						Data:      "room id is missing",
+				fmt.Printf("msg event - join\n")
+				if msg.RoomId != "" {
+					r := goio.Rooms().Get(msg.RoomId)
+					if r == nil {
+						r = goio.NewRoom(msg.RoomId)
 					}
 
-					return
+					r.AddUser <- clt.User
+					r.Message <- msg
 				}
-
-				room := goio.Rooms().Get(message.RoomId)
-				if room == nil {
-					clt.Message <- &goio.Message{
-						EventName: "error",
-						Data:      "room id is invalid",
-					}
-
-					return
-				}
-
-				room.AddUser <- clt.User
 
 			case "leave":
-				if message.RoomId == "" {
-					clt.Message <- &goio.Message{
-						EventName: "error",
-						Data:      "room id is missing",
+				fmt.Printf("msg event - leave\n")
+				if msg.RoomId != "" {
+					r := goio.Rooms().Get(msg.RoomId)
+					if r != nil {
+						r.DelUser <- clt.User
+						r.Message <- msg
 					}
-
-					return
+				}
+			case "broadcast":
+				fmt.Printf("msg event - broadcast\n")
+				if msg.RoomId != "" {
+					r := goio.Rooms().Get(msg.RoomId)
+					if r != nil {
+						r.Message <- msg
+					}
+				} else {
+					for _, r := range clt.User.Rooms() {
+						r.Message <- msg
+					}
 				}
 
-				room := goio.Rooms().Get(message.RoomId)
-				if room == nil {
-					clt.Message <- &goio.Message{
-						EventName: "error",
-						Data:      "room id is invalid",
-					}
-
-					return
-				}
-
-				room.DelUser <- clt.User
+			default:
+				fmt.Println("unknown user msg")
 			}
-		}(message, clt)
+
+			fmt.Println("user send msg - done")
+
+		}(msg, clt)
 
 		return 204, ""
 	})

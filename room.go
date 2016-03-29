@@ -1,6 +1,9 @@
 package goio
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 func NewRoom(roomId string) *Room {
 	room := &Room{
@@ -14,36 +17,43 @@ func NewRoom(roomId string) *Room {
 		userIds:    make(chan []string),
 	}
 
+	Rooms().AddRoom <- room
+
 	go func(room *Room) {
 		for {
 			select {
 			case u := <-room.AddUser:
+				fmt.Printf("room %s added user %s \n", room.Id, u.Id)
 				room.Users[u.Id] = u
-
-				u.AddRoom <- room
+				u.addRoom <- room
 
 			case u := <-room.DelUser:
+				fmt.Printf("---------> room deleting user\n")
+
 				delete(room.Users, u.Id)
 
+				go func(u *User) {
+					u.delRoom <- room
+				}(u)
+
+				fmt.Printf("room %s deleted user %s, still have %d users \n", room.Id, u.Id, len(room.Users))
+
 				if len(room.Users) == 0 {
-					close(room.AddUser)
-					close(room.DelUser)
-					close(room.Message)
-					close(room.getUserIds)
-					close(room.userIds)
+					Rooms().DelRoom <- room
 					room.Users = nil
 
-					Rooms().DelRoom <- room
-
+					fmt.Printf("room %s deleted, break its loop\n", room.Id)
 					//stop this loop
 					return
 				}
 
 			case msg := <-room.Message:
+				fmt.Printf("room %s received message from user %s client %s \n", room.Id, msg.CallerId, msg.ClientId)
+
 				for _, u := range room.Users {
-					go func(u *User, msg *Message) {
-						u.Message <- msg
-					}(u, msg)
+					fmt.Printf("msg sent to user %s - start \n", u.Id)
+					u.message <- msg
+					fmt.Printf("msg sent to user %s - end \n", u.Id)
 				}
 
 			case <-room.getUserIds:
@@ -57,6 +67,8 @@ func NewRoom(roomId string) *Room {
 		}
 
 	}(room)
+
+	fmt.Printf("created new room %s\n", room.Id)
 
 	return room
 }

@@ -59,3 +59,12 @@ func (r *users) Get(userId string) *User {
 	r.getUser <- userId
 	return <-r.user
 }
+
+func (r *users) MustGet(userId string) *User {
+	u := r.Get(userId)
+	if u == nil {
+		u = NewUser(userId)
+	}
+
+	return u
+}
