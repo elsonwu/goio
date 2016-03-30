@@ -21,7 +21,7 @@ var flagSSLHost = flag.String("sslhost", "", "the server host for https, it will
 var flagAllowOrigin = flag.String("alloworigin", "*", "the host allow to cross site ajax")
 var flagDebug = flag.Bool("debug", false, "enable debug mode or not")
 var flagClientLifeCycle = flag.Int64("lifecycle", 30, "how many seconds of the client life cycle")
-var flagClientMessageTimeout = flag.Int64("messagetimeout", 15, "how many seconds of the client keep waiting for new messages")
+var flagClientMessageTimeout = flag.Int("messagetimeout", 15, "how many seconds of the client keep waiting for new messages")
 var flagEnableHttps = flag.Bool("enablehttps", false, "enable https or not")
 var flagDisableHttp = flag.Bool("disablehttp", false, "disable http and use https only")
 var flagCertFile = flag.String("certfile", "", "certificate file path")
@@ -31,6 +31,10 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.Parse()
+
+	goio.Rooms()
+	goio.Users()
+	goio.Clients()
 
 	if *flagDebug {
 		go func() {
@@ -107,7 +111,7 @@ func main() {
 
 		m.Get("/test/client", func() string {
 
-			count := 10000
+			count := 1000
 			all := make(chan struct{}, count)
 
 			st := time.Now().Second()
@@ -235,14 +239,14 @@ func main() {
 			return 404, fmt.Sprintf("Client %s does not exist\n", id)
 		}
 
-		clt.Handshake()
-		// we handshake again after it finished no matter timeout or ok
-		defer clt.Handshake()
+		for i, wait := 0, 1; i*wait <= *flagClientMessageTimeout; i++ {
 
-		for {
+			// keep this client alive
+			clt.Handshake()
+
 			msgs := clt.Msgs()
 			if len(msgs) == 0 {
-				time.Sleep(3 * time.Second)
+				time.Sleep(time.Duration(wait) * time.Second)
 				continue
 			}
 
@@ -253,6 +257,8 @@ func main() {
 
 			return 200, string(m)
 		}
+
+		return 204, ""
 	})
 
 	m.Post("/message/:client_id", func(params martini.Params, req *http.Request) (int, string) {
@@ -272,6 +278,10 @@ func main() {
 
 		msg.CallerId = clt.User.Id
 		msg.ClientId = clt.Id
+
+		clt.Handshake()
+		// we handshake again after it finished no matter timeout or ok
+		defer clt.Handshake()
 
 		go func(msg *goio.Message, clt *goio.Client) {
 			if *flagDebug {

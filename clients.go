@@ -5,7 +5,6 @@ import "sync"
 func NewClients() *clients {
 	clts := new(clients)
 	clts.Clients = make(map[string]*Client)
-	clts.Message = make(chan *Message)
 	clts.addClt = make(chan *Client)
 	clts.delClt = make(chan *Client)
 
@@ -40,7 +39,6 @@ func NewClients() *clients {
 
 type clients struct {
 	Clients map[string]*Client
-	Message chan *Message
 	addClt  chan *Client
 	delClt  chan *Client
 

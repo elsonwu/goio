@@ -5,8 +5,8 @@ import "sync"
 func NewUsers() *users {
 	us := new(users)
 	us.Users = make(map[string]*User)
-	us.AddUser = make(chan *User)
-	us.DelUser = make(chan *User)
+	us.addUser = make(chan *User)
+	us.delUser = make(chan *User)
 
 	us.getUser = make(chan string)
 	us.user = make(chan *User)
@@ -17,10 +17,10 @@ func NewUsers() *users {
 	go func(us *users) {
 		for {
 			select {
-			case u := <-us.AddUser:
+			case u := <-us.addUser:
 				us.Users[u.Id] = u
 
-			case u := <-us.DelUser:
+			case u := <-us.delUser:
 				delete(us.Users, u.Id)
 
 			case userId := <-us.getUser:
@@ -39,8 +39,8 @@ func NewUsers() *users {
 
 type users struct {
 	Users   map[string]*User
-	AddUser chan *User
-	DelUser chan *User
+	addUser chan *User
+	delUser chan *User
 
 	getUser chan string
 	user    chan *User // after GetUser

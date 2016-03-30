@@ -4,9 +4,9 @@ import "sync"
 
 func NewRooms() *rooms {
 	rs := new(rooms)
-	rs.Rooms = make(map[string]*Room)
-	rs.AddRoom = make(chan *Room)
-	rs.DelRoom = make(chan *Room)
+	rs.rooms = make(map[string]*Room)
+	rs.addRoom = make(chan *Room)
+	rs.delRoom = make(chan *Room)
 
 	rs.getRoom = make(chan string)
 	rs.room = make(chan *Room)
@@ -17,18 +17,18 @@ func NewRooms() *rooms {
 	go func(rs *rooms) {
 		for {
 			select {
-			case r := <-rs.AddRoom:
-				rs.Rooms[r.Id] = r
+			case r := <-rs.addRoom:
+				rs.rooms[r.Id] = r
 
-			case r := <-rs.DelRoom:
-				delete(rs.Rooms, r.Id)
+			case r := <-rs.delRoom:
+				delete(rs.rooms, r.Id)
 
 			case roomId := <-rs.getRoom:
-				room, _ := rs.Rooms[roomId]
+				room, _ := rs.rooms[roomId]
 				rs.room <- room
 
 			case <-rs.getCount:
-				rs.count <- len(rs.Rooms)
+				rs.count <- len(rs.rooms)
 			}
 		}
 
@@ -38,9 +38,9 @@ func NewRooms() *rooms {
 }
 
 type rooms struct {
-	Rooms   map[string]*Room
-	AddRoom chan *Room
-	DelRoom chan *Room
+	rooms   map[string]*Room
+	addRoom chan *Room
+	delRoom chan *Room
 	room    chan *Room
 	getRoom chan string
 

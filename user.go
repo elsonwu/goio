@@ -18,7 +18,7 @@ func NewUser(userId string) *User {
 		getData: make(chan string),
 	}
 
-	Users().AddUser <- user
+	Users().addUser <- user
 
 	go func(user *User) {
 		for {
@@ -36,7 +36,7 @@ func NewUser(userId string) *User {
 					}
 
 					// fmt.Printf("sending message to user[%s] client %s - start \n", c.User.Id, c.Id)
-					c.message <- msg
+					c.receiveMessage <- msg
 					// fmt.Printf("sending message to user[%s] client %s - end \n", c.User.Id, c.Id)
 				}
 
@@ -63,7 +63,7 @@ func NewUser(userId string) *User {
 				if len(user.Clients) == 0 {
 					fmt.Printf("## user %s has 0 client, need to del\n", user.Id)
 
-					Users().DelUser <- user
+					Users().delUser <- user
 					for _, r := range user.rooms {
 						r.DelUser <- user
 					}
