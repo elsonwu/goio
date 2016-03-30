@@ -5,6 +5,8 @@ import "sync"
 func NewClients() *clients {
 	clts := new(clients)
 	clts.Clients = make(map[string]*Client)
+	clts.Message = make(chan *Message)
+
 	clts.addClt = make(chan *Client)
 	clts.delClt = make(chan *Client)
 
@@ -17,6 +19,11 @@ func NewClients() *clients {
 	go func(clts *clients) {
 		for {
 			select {
+
+			case msg := <-clts.Message:
+				for _, c := range clts.Clients {
+					c.receiveMessage <- msg
+				}
 			case c := <-clts.addClt:
 				clts.Clients[c.Id] = c
 
@@ -39,8 +46,11 @@ func NewClients() *clients {
 
 type clients struct {
 	Clients map[string]*Client
-	addClt  chan *Client
-	delClt  chan *Client
+
+	Message chan *Message
+
+	addClt chan *Client
+	delClt chan *Client
 
 	clt    chan *Client
 	getClt chan string
