@@ -69,6 +69,11 @@ func main() {
 
 	if *flagDebug {
 
+		m.GET("/test/gc", func(ctx *gin.Context) {
+			runtime.GC()
+			ctx.String(200, "completed")
+		})
+
 		m.GET("/test/message", func(ctx *gin.Context) {
 			userId1 := "u1"
 			user1 := goio.Users().MustGet(userId1)
@@ -115,30 +120,20 @@ func main() {
 			count, _ := strconv.Atoi(ctx.Param("num"))
 			fmt.Printf("adding %d clients\n", count)
 
-			all := make(chan struct{}, count)
-
 			st := time.Now().Second()
 			for i := 1; i <= count; i++ {
-				go func(i int) {
-					userId := strconv.Itoa(i)
-					user := goio.Users().MustGet(userId)
+				userId := strconv.Itoa(i)
+				user := goio.Users().MustGet(userId)
 
-					goio.NewClient(user)
+				goio.NewClient(user)
 
-					roomId := strconv.Itoa(i % 1000)
-					room := goio.Rooms().Get(roomId)
-					if room == nil {
-						room = goio.NewRoom(roomId)
-					}
+				roomId := strconv.Itoa(i % 1000)
+				room := goio.Rooms().Get(roomId)
+				if room == nil {
+					room = goio.NewRoom(roomId)
+				}
 
-					goio.AddRoomUser(room, user)
-
-					all <- struct{}{}
-				}(i)
-			}
-
-			for i := 0; i < count; i++ {
-				<-all
+				goio.AddRoomUser(room, user)
 			}
 
 			ctx.String(200, fmt.Sprintf("%d s", time.Now().Second()-st))
@@ -189,7 +184,12 @@ func main() {
 
 		clt := goio.Clients().Get(clientId)
 		if clt != nil && clt.User != nil {
-			clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}
+			select {
+			case clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}:
+			case <-time.After(3 * time.Second):
+				//timeout, don't add data
+			}
+
 		}
 
 		ctx.String(204, "")
@@ -231,7 +231,7 @@ func main() {
 	m.GET("/kill_client/:client_id", func(ctx *gin.Context) {
 		clt := goio.Clients().Get(ctx.Param("client_id"))
 		if clt != nil {
-			clt.User.DelClt <- clt
+			goio.DelUserClt(clt.User, clt)
 		}
 
 		ctx.String(204, "")
@@ -310,7 +310,12 @@ func main() {
 					}
 
 					goio.AddRoomUser(r, clt.User)
-					r.Message <- msg
+
+					select {
+					case r.Message <- msg:
+					case <-time.After(10 * time.Second):
+					}
+
 				}
 
 			case "leave":
@@ -319,7 +324,10 @@ func main() {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
 						goio.DelRoomUser(r, clt.User)
-						r.Message <- msg
+						select {
+						case r.Message <- msg:
+						case <-time.After(10 * time.Second):
+						}
 					}
 				}
 			case "broadcast":
@@ -327,11 +335,17 @@ func main() {
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
-						r.Message <- msg
+						select {
+						case r.Message <- msg:
+						case <-time.After(10 * time.Second):
+						}
 					}
 				} else {
 					for _, r := range clt.User.Rooms() {
-						r.Message <- msg
+						select {
+						case r.Message <- msg:
+						case <-time.After(10 * time.Second):
+						}
 					}
 				}
 

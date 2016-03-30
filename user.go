@@ -1,5 +1,7 @@
 package goio
 
+import "time"
+
 func NewUser(userId string) *User {
 	user := &User{
 		Id:      userId,
@@ -7,7 +9,7 @@ func NewUser(userId string) *User {
 		rooms:   make(map[string]*Room),
 		message: make(chan *Message),
 		addClt:  make(chan *Client),
-		DelClt:  make(chan *Client),
+		delClt:  make(chan *Client),
 		addRoom: make(chan *Room),
 		delRoom: make(chan *Room),
 		dataMap: make(map[string]string),
@@ -47,20 +49,21 @@ func NewUser(userId string) *User {
 				// fmt.Printf("#### user %s case addClt %s\n", user.Id, clt.Id)
 				user.Clients[clt.Id] = clt
 
-			case clt, ok := <-user.DelClt:
+			case clt, ok := <-user.delClt:
 
 				if !ok {
 					return
 				}
-
-				Clients().delClt <- clt
 
 				delete(user.Clients, clt.Id)
 
 				if len(user.Clients) == 0 {
 					// fmt.Printf("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
-						r.delUser <- user
+						select {
+						case r.delUser <- user:
+						case <-time.After(10 * time.Second):
+						}
 					}
 
 					Users().delUser <- user
@@ -116,7 +119,7 @@ type User struct {
 	rooms    map[string]*Room
 	message  chan *Message
 	addClt   chan *Client
-	DelClt   chan *Client
+	delClt   chan *Client
 	addRoom  chan *Room
 	delRoom  chan *Room
 	AddData  chan UserData

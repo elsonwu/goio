@@ -23,8 +23,7 @@ func NewClient(user *User) *Client {
 		lastHandshake:  time.Now().Unix(),
 	}
 
-	Clients().addClt <- clt
-	user.addClt <- clt
+	AddUserClt(user, clt)
 
 	// check for client life cycle
 	go func(clt *Client) {
@@ -35,11 +34,7 @@ func NewClient(user *User) *Client {
 				continue
 			}
 
-			Clients().delClt <- clt
-
-			// timeout, kill this client
-			// fmt.Printf("user %s clt %s timeout\n", clt.User.Id, clt.Id)
-			clt.User.DelClt <- clt
+			DelUserClt(clt.User, clt)
 
 			// fmt.Printf("---> clt %s deleted, break life cycle loop\n", clt.Id)
 			close(clt.close)
@@ -59,6 +54,11 @@ func NewClient(user *User) *Client {
 				clt.messages = make([]*Message, 0, 10)
 
 			case <-clt.close:
+				clt.User = nil
+				close(clt.receiveMessage)
+				close(clt.fetchMessages)
+				close(clt.msgs)
+
 				// fmt.Printf("---> clt %s del, break listen loop\n", clt.Id)
 				return
 			}

@@ -1,6 +1,9 @@
 package goio
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 func NewRoom(roomId string) *Room {
 	room := &Room{
@@ -42,7 +45,10 @@ func NewRoom(roomId string) *Room {
 
 				for _, u := range room.users {
 					// fmt.Printf("msg sent to user %s - start \n", u.Id)
-					u.message <- msg
+					select {
+					case u.message <- msg:
+					case <-time.After(10 * time.Second):
+					}
 					// fmt.Printf("msg sent to user %s - end \n", u.Id)
 				}
 
