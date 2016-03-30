@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elsonwu/goio"
-	"github.com/go-martini/martini"
+	"github.com/gin-gonic/gin"
 )
 
 var flagHost = flag.String("host", "127.0.0.1:9999", "the default server host")
@@ -47,28 +47,29 @@ func main() {
 
 	goio.LifeCycle = *flagClientLifeCycle
 
-	martini.Env = martini.Dev
-	router := martini.NewRouter()
-	mart := martini.New()
-	mart.Action(router.Handle)
-	m := &martini.ClassicMartini{mart, router}
-	m.Use(martini.Recovery())
-	m.Use(func(res http.ResponseWriter) {
-		res.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		res.Header().Set("Access-Control-Allow-Credentials", "true")
-		res.Header().Set("Access-Control-Allow-Methods", "GET,POST")
-		res.Header().Set("Powered-By", "Goio")
+	m := gin.New()
+	m.Use(gin.Recovery())
+	if *flagDebug {
+		m.Use(gin.Logger())
+	}
+
+	m.Use(func(ctx *gin.Context) {
+		ctx.Header("Content-Type", "text/plain; charset=utf-8")
+		ctx.Header("Access-Control-Allow-Credentials", "true")
+		ctx.Header("Access-Control-Allow-Methods", "GET,POST")
+		ctx.Header("Powered-By", "Goio")
+
 		if "" != *flagAllowOrigin {
 			allowOrigins := strings.Split(*flagAllowOrigin, ",")
 			for _, allowOrigin := range allowOrigins {
-				res.Header().Add("Access-Control-Allow-Origin", allowOrigin)
+				ctx.Writer.Header().Add("Access-Control-Allow-Origin", allowOrigin)
 			}
 		}
 	})
 
 	if *flagDebug {
 
-		m.Get("/test/message", func() string {
+		m.GET("/test/message", func(ctx *gin.Context) {
 			userId1 := "u1"
 			user1 := goio.Users().MustGet(userId1)
 			clt1 := goio.NewClient(user1)
@@ -79,7 +80,7 @@ func main() {
 				room = goio.NewRoom(roomId)
 			}
 
-			room.AddUser <- user1
+			goio.AddRoomUser(room, user1)
 
 			go func(clt1 *goio.Client) {
 				for {
@@ -106,12 +107,14 @@ func main() {
 
 			room.Message <- msg
 
-			return "completed"
+			ctx.String(200, "completed")
 		})
 
-		m.Get("/test/client", func() string {
+		m.GET("/test/client/:num", func(ctx *gin.Context) {
 
-			count := 1000
+			count, _ := strconv.Atoi(ctx.Param("num"))
+			fmt.Printf("adding %d clients\n", count)
+
 			all := make(chan struct{}, count)
 
 			st := time.Now().Second()
@@ -128,7 +131,7 @@ func main() {
 						room = goio.NewRoom(roomId)
 					}
 
-					room.AddUser <- user
+					goio.AddRoomUser(room, user)
 
 					all <- struct{}{}
 				}(i)
@@ -138,64 +141,68 @@ func main() {
 				<-all
 			}
 
-			return fmt.Sprintf("%d s", time.Now().Second()-st)
+			ctx.String(200, fmt.Sprintf("%d s", time.Now().Second()-st))
 		})
 	}
 
-	m.Get("/count", func(req *http.Request) string {
-		return fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count())
+	m.GET("/count", func(ctx *gin.Context) {
+		ctx.String(200, fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count()))
 	})
 
 	// get user ids array from the given room
-	m.Get("/room/users/:room_id", func(params martini.Params, req *http.Request) (int, string) {
-		roomId := params["room_id"]
+	m.GET("/room/users/:room_id", func(ctx *gin.Context) {
+		roomId := ctx.Param("room_id")
 
 		room := goio.Rooms().Get(roomId)
 		if room == nil {
-			return 200, ""
+			ctx.String(200, "")
+			return
 		}
 
-		return 200, strings.Join(room.UserIds(), ",")
+		ctx.String(200, strings.Join(room.UserIds(), ","))
 	})
 
-	m.Get("/user/data/:user_id/:key", func(params martini.Params, req *http.Request) (int, string) {
-		userId := params["user_id"]
-		key := params["key"]
+	m.GET("/user/data/:user_id/:key", func(ctx *gin.Context) {
+		userId := ctx.Param("user_id")
+		key := ctx.Param("key")
 
 		user := goio.Users().Get(userId)
 		if user == nil {
-			return 200, ""
+			ctx.String(200, "")
+			return
 		}
 
-		return 200, user.GetData(key)
+		ctx.String(200, user.GetData(key))
 	})
 
-	m.Post("/user/data/:client_id/:key", func(params martini.Params, req *http.Request) (int, string) {
-		val, err := ioutil.ReadAll(req.Body)
-		req.Body.Close()
+	m.POST("/user/data/:client_id/:key", func(ctx *gin.Context) {
+		val, err := ioutil.ReadAll(ctx.Request.Body)
+		ctx.Request.Body.Close()
 
 		if err != nil {
-			return 500, err.Error()
+			ctx.String(500, err.Error())
+			return
 		}
 
-		clientId := params["client_id"]
-		key := params["key"]
+		clientId := ctx.Param("client_id")
+		key := ctx.Param("key")
 
 		clt := goio.Clients().Get(clientId)
 		if clt != nil && clt.User != nil {
 			clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}
 		}
 
-		return 200, ""
+		ctx.String(204, "")
 	})
 
-	m.Post("/online_status", func(params martini.Params, req *http.Request) (int, string) {
-		val, err := ioutil.ReadAll(req.Body)
-		req.Body.Close()
+	m.POST("/online_status", func(ctx *gin.Context) {
+		val, err := ioutil.ReadAll(ctx.Request.Body)
+		ctx.Request.Body.Close()
 
 		if err != nil {
 			fmt.Printf("online_status error %s\n", err.Error())
-			return 500, err.Error()
+			ctx.String(500, err.Error())
+			return
 		}
 
 		userIds := strings.Split(string(val), ",")
@@ -210,33 +217,33 @@ func main() {
 			}
 		}
 
-		return 200, status
+		ctx.String(200, status)
 	})
 
-	m.Post("/client/:user_id", func(params martini.Params, req *http.Request) (int, string) {
-		userId := params["user_id"]
+	m.POST("/client/:user_id", func(ctx *gin.Context) {
+		userId := ctx.Param("user_id")
 		user := goio.Users().MustGet(userId)
 		clt := goio.NewClient(user)
 
-		return 200, clt.Id
+		ctx.String(200, clt.Id)
 	})
 
-	m.Get("/kill_client/:client_id", func(params martini.Params, req *http.Request) (int, string) {
-
-		clt := goio.Clients().Get(params["client_id"])
+	m.GET("/kill_client/:client_id", func(ctx *gin.Context) {
+		clt := goio.Clients().Get(ctx.Param("client_id"))
 		if clt != nil {
 			clt.User.DelClt <- clt
 		}
 
-		return 204, ""
+		ctx.String(204, "")
 	})
 
-	m.Get("/message/:client_id", func(params martini.Params, req *http.Request) (int, string) {
-		id := params["client_id"]
+	m.GET("/message/:client_id", func(ctx *gin.Context) {
+		id := ctx.Param("client_id")
 		clt := goio.Clients().Get(id)
 
 		if clt == nil {
-			return 404, fmt.Sprintf("Client %s does not exist\n", id)
+			ctx.String(404, fmt.Sprintf("Client %s does not exist\n", id))
+			return
 		}
 
 		for i, wait := 0, 1; i*wait <= *flagClientMessageTimeout; i++ {
@@ -252,29 +259,32 @@ func main() {
 
 			m, err := json.Marshal(msgs)
 			if err != nil {
-				return 500, err.Error()
+				ctx.String(500, err.Error())
+				return
 			}
 
-			return 200, string(m)
+			ctx.String(200, string(m))
+			return
 		}
 
-		return 204, ""
+		ctx.String(200, "")
 	})
 
-	m.Post("/message/:client_id", func(params martini.Params, req *http.Request) (int, string) {
-		id := params["client_id"]
+	m.POST("/message/:client_id", func(ctx *gin.Context) {
+		id := ctx.Param("client_id")
 		clt := goio.Clients().Get(id)
 		if clt == nil {
-			return 403, fmt.Sprintf("Client %s does not exist\n", id)
+			ctx.String(403, fmt.Sprintf("Client %s does not exist\n", id))
+			return
 		}
 
 		if clt.User == nil {
-			return 403, fmt.Sprintf("Client %s does not connect with any user\n", id)
+			ctx.String(403, fmt.Sprintf("Client %s does not connect with any user\n", id))
+			return
 		}
 
 		msg := &goio.Message{}
-		json.NewDecoder(req.Body).Decode(msg)
-		req.Body.Close()
+		ctx.BindJSON(msg)
 
 		msg.CallerId = clt.User.Id
 		msg.ClientId = clt.Id
@@ -299,7 +309,7 @@ func main() {
 						r = goio.NewRoom(msg.RoomId)
 					}
 
-					r.AddUser <- clt.User
+					goio.AddRoomUser(r, clt.User)
 					r.Message <- msg
 				}
 
@@ -308,7 +318,7 @@ func main() {
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
-						r.DelUser <- clt.User
+						goio.DelRoomUser(r, clt.User)
 						r.Message <- msg
 					}
 				}
@@ -333,10 +343,10 @@ func main() {
 
 		}(msg, clt)
 
-		return 204, ""
+		ctx.String(204, "")
 	})
 
-	m.Options("/.*", func(req *http.Request) {})
+	m.OPTIONS("/*path", func(ctx *gin.Context) {})
 
 	host := *flagHost
 	if !*flagEnableHttps && *flagDisableHttp {

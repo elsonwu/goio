@@ -1,7 +1,6 @@
 package goio
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -36,12 +35,13 @@ func NewClient(user *User) *Client {
 				continue
 			}
 
-			// timeout, kill this client
-			fmt.Printf("user %s clt %s timeout\n", clt.User.Id, clt.Id)
-			clt.User.DelClt <- clt
-			clt.User = nil
+			Clients().delClt <- clt
 
-			fmt.Printf("---> clt %s deleted, break life cycle loop\n", clt.Id)
+			// timeout, kill this client
+			// fmt.Printf("user %s clt %s timeout\n", clt.User.Id, clt.Id)
+			clt.User.DelClt <- clt
+
+			// fmt.Printf("---> clt %s deleted, break life cycle loop\n", clt.Id)
 			close(clt.close)
 			return
 		}
@@ -59,14 +59,13 @@ func NewClient(user *User) *Client {
 				clt.messages = make([]*Message, 0, 10)
 
 			case <-clt.close:
-				fmt.Printf("---> clt %s del, break listen loop\n", clt.Id)
-				// break
+				// fmt.Printf("---> clt %s del, break listen loop\n", clt.Id)
 				return
 			}
 		}
 	}(clt)
 
-	fmt.Printf("new client %s to user %s\n", clt.Id, clt.User.Id)
+	// fmt.Printf("new client %s to user %s\n", clt.Id, clt.User.Id)
 	return clt
 }
 
@@ -83,7 +82,7 @@ type Client struct {
 }
 
 func (c *Client) Handshake() {
-	fmt.Printf("clt %s handshake\n", c.Id)
+	// fmt.Printf("clt %s handshake\n", c.Id)
 	c.lastHandshake = time.Now().Unix()
 }
 

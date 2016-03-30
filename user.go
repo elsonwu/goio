@@ -1,7 +1,5 @@
 package goio
 
-import "fmt"
-
 func NewUser(userId string) *User {
 	user := &User{
 		Id:      userId,
@@ -31,7 +29,7 @@ func NewUser(userId string) *User {
 				// fmt.Printf("user %s has %d clients, received message from user %s client %s\n", user.Id, len(user.Clients), msg.CallerId, msg.ClientId)
 				for _, c := range user.Clients {
 					if c.Id == msg.ClientId {
-						fmt.Printf("ignore message send from myself user[%s] client %s\n", c.User.Id, c.Id)
+						// fmt.Printf("ignore message send from myself user[%s] client %s\n", c.User.Id, c.Id)
 						continue
 					}
 
@@ -46,7 +44,7 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				fmt.Printf("#### user %s case addClt %s\n", user.Id, clt.Id)
+				// fmt.Printf("#### user %s case addClt %s\n", user.Id, clt.Id)
 				user.Clients[clt.Id] = clt
 
 			case clt, ok := <-user.DelClt:
@@ -55,36 +53,28 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				delete(user.Clients, clt.Id)
-				fmt.Printf("user %s case delClt - %s, still has %d clients \n", user.Id, clt.Id, len(user.Clients))
-
 				Clients().delClt <- clt
 
-				if len(user.Clients) == 0 {
-					fmt.Printf("## user %s has 0 client, need to del\n", user.Id)
+				delete(user.Clients, clt.Id)
 
-					Users().delUser <- user
+				if len(user.Clients) == 0 {
+					// fmt.Printf("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
-						r.DelUser <- user
+						r.delUser <- user
 					}
 
-					user.Clients = nil
-					user.rooms = nil
-					user.dataMap = nil
+					Users().delUser <- user
 
-					fmt.Printf("-------> user %s deleted, break its loop\n", user.Id)
+					// fmt.Printf("user %s deleted, break its loop\n", user.Id)
 					return
-				} else {
-					fmt.Printf("## user %s has %d client\n", user.Id, len(user.Clients))
 				}
-
 			case room, ok := <-user.addRoom:
 
 				if !ok {
 					return
 				}
 
-				fmt.Println("user case addRoom")
+				// fmt.Println("user case addRoom")
 				user.rooms[room.Id] = room
 
 			case room, ok := <-user.delRoom:
@@ -92,7 +82,7 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				fmt.Println("user case delRoom")
+				// fmt.Println("user case delRoom")
 				delete(user.rooms, room.Id)
 
 			case key, ok := <-user.getData:
@@ -100,14 +90,14 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				fmt.Println("user case getData")
+				// fmt.Println("user case getData")
 				user.data <- user.dataMap[key]
 
 			case userData, ok := <-user.AddData:
 				if !ok {
 					return
 				}
-				fmt.Println("user case AddData")
+				// fmt.Println("user case AddData")
 				user.dataMap[userData.Key] = userData.Val
 
 			case <-user.getRooms:
