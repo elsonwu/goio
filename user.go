@@ -4,18 +4,20 @@ import "time"
 
 func NewUser(userId string) *User {
 	user := &User{
-		Id:      userId,
-		Clients: make(map[string]*Client),
-		rooms:   make(map[string]*Room),
-		message: make(chan *Message),
-		addClt:  make(chan *Client),
-		delClt:  make(chan *Client),
-		addRoom: make(chan *Room),
-		delRoom: make(chan *Room),
-		dataMap: make(map[string]string),
-		data:    make(chan string),
-		AddData: make(chan UserData),
-		getData: make(chan string),
+		Id:       userId,
+		Clients:  make(map[string]*Client),
+		rooms:    make(map[string]*Room),
+		message:  make(chan *Message),
+		addClt:   make(chan *Client),
+		delClt:   make(chan *Client),
+		addRoom:  make(chan *Room),
+		delRoom:  make(chan *Room),
+		dataMap:  make(map[string]string),
+		data:     make(chan string),
+		getRooms: make(chan struct{}),
+		rs:       make(chan map[string]*Room),
+		AddData:  make(chan UserData),
+		getData:  make(chan string),
 	}
 
 	Users().addUser <- user
@@ -67,6 +69,19 @@ func NewUser(userId string) *User {
 					}
 
 					Users().delUser <- user
+					close(user.AddData)
+					close(user.addClt)
+					close(user.addRoom)
+					close(user.data)
+					close(user.delClt)
+					close(user.delRoom)
+					close(user.getData)
+					close(user.getRooms)
+					close(user.message)
+					close(user.rs)
+					user.Clients = nil
+					user.dataMap = nil
+					user.rooms = nil
 
 					// fmt.Printf("user %s deleted, break its loop\n", user.Id)
 					return

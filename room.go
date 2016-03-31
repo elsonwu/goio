@@ -35,6 +35,12 @@ func NewRoom(roomId string) *Room {
 					Rooms().delRoom <- room
 					room.users = nil
 
+					close(room.Message)
+					close(room.addUser)
+					close(room.delUser)
+					close(room.getUserIds)
+					close(room.userIds)
+
 					// fmt.Printf("room %s deleted, break its loop\n", room.Id)
 					//stop this loop
 					return
