@@ -14,6 +14,7 @@ import (
 
 	"github.com/elsonwu/goio"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
 )
 
 var flagHost = flag.String("host", "127.0.0.1:9999", "the default server host")
@@ -95,7 +96,7 @@ func main() {
 						continue
 					}
 
-					fmt.Printf("user %s clt %s received message %#v \n", clt1.User.Id, clt1.Id, msgs)
+					glog.V(1).Infof("user %s clt %s received message %#v \n", clt1.User.Id, clt1.Id, msgs)
 				}
 			}(clt1)
 
@@ -118,7 +119,7 @@ func main() {
 		m.GET("/test/client/:num", func(ctx *gin.Context) {
 
 			count, _ := strconv.Atoi(ctx.Param("num"))
-			fmt.Printf("adding %d clients\n", count)
+			glog.V(1).Infof("adding %d clients\n", count)
 
 			st := time.Now().Second()
 			for i := 1; i <= count; i++ {
@@ -200,13 +201,13 @@ func main() {
 		ctx.Request.Body.Close()
 
 		if err != nil {
-			fmt.Printf("online_status error %s\n", err.Error())
+			glog.V(1).Infof("online_status error %s\n", err.Error())
 			ctx.String(500, err.Error())
 			return
 		}
 
 		userIds := strings.Split(string(val), ",")
-		fmt.Printf("checking userIds:%s\n", string(val))
+		glog.V(1).Infof("checking userIds:%s\n", string(val))
 
 		status := ""
 		for _, userId := range userIds {
@@ -298,11 +299,11 @@ func main() {
 				log.Printf("post msg: %#v\n", *msg)
 			}
 
-			fmt.Println("user send msg - begin")
+			glog.V(1).Infoln("user send msg - begin")
 
 			switch msg.EventName {
 			case "join":
-				fmt.Printf("msg event - join\n")
+				glog.V(1).Infof("msg event - join\n")
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r == nil {
@@ -319,7 +320,7 @@ func main() {
 				}
 
 			case "leave":
-				fmt.Printf("msg event - leave\n")
+				glog.V(1).Infof("msg event - leave\n")
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
@@ -331,7 +332,8 @@ func main() {
 					}
 				}
 			case "broadcast":
-				fmt.Printf("msg event - broadcast\n")
+				glog.V(1).Infoln("msg event - broadcast\n")
+
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
@@ -350,10 +352,10 @@ func main() {
 				}
 
 			default:
-				fmt.Println("unknown user msg")
+				glog.V(1).Infoln("unknown user msg")
 			}
 
-			fmt.Println("user send msg - done")
+			glog.V(1).Infoln("user send msg - done")
 
 		}(msg, clt)
 

@@ -3,6 +3,8 @@ package goio
 import (
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 func NewRoom(roomId string) *Room {
@@ -23,14 +25,14 @@ func NewRoom(roomId string) *Room {
 		for {
 			select {
 			case u := <-room.addUser:
-				// fmt.Printf("room %s added user %s \n", room.Id, u.Id)
+				glog.V(3).Infof("room %s added user %s\n", room.Id, u.Id)
 				room.users[u.Id] = u
 
 			case u := <-room.delUser:
-				// fmt.Printf("---------> room deleting user\n")
+				glog.V(3).Infof("room %s deleting user %s\n", room.Id, u.Id)
 				delete(room.users, u.Id)
 
-				// fmt.Printf("room %s deleted user %s, still have %d users \n", room.Id, u.Id, len(room.users))
+				glog.V(3).Infof("room %s deleted user %s, still have %d users \n", room.Id, u.Id, len(room.users))
 				if len(room.users) == 0 {
 					Rooms().delRoom <- room
 					room.users = nil
@@ -41,21 +43,22 @@ func NewRoom(roomId string) *Room {
 					close(room.getUserIds)
 					close(room.userIds)
 
-					// fmt.Printf("room %s deleted, break its loop\n", room.Id)
+					glog.V(3).Infof("room %s deleted, break its loop\n", room.Id)
+
 					//stop this loop
 					return
 				}
 
 			case msg := <-room.Message:
-				// fmt.Printf("room %s received message from user %s client %s \n", room.Id, msg.CallerId, msg.ClientId)
+				glog.V(3).Infof("room %s received message from user %s client %s \n", room.Id, msg.CallerId, msg.ClientId)
 
 				for _, u := range room.users {
-					// fmt.Printf("msg sent to user %s - start \n", u.Id)
 					select {
 					case u.message <- msg:
 					case <-time.After(10 * time.Second):
 					}
-					// fmt.Printf("msg sent to user %s - end \n", u.Id)
+
+					glog.V(3).Infof("msg sent to user %s\n", u.Id)
 				}
 
 			case <-room.getUserIds:
@@ -70,7 +73,7 @@ func NewRoom(roomId string) *Room {
 
 	}(room)
 
-	// fmt.Printf("created new room %s\n", room.Id)
+	glog.V(2).Infof("created new room %s\n", room.Id)
 
 	return room
 }

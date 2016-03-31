@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -35,9 +37,8 @@ func NewClient(user *User) *Client {
 			}
 
 			DelUserClt(clt.User, clt)
-
-			// fmt.Printf("---> clt %s deleted, break life cycle loop\n", clt.Id)
 			close(clt.close)
+
 			return
 		}
 	}(clt)
@@ -59,13 +60,13 @@ func NewClient(user *User) *Client {
 				close(clt.fetchMessages)
 				close(clt.msgs)
 
-				// fmt.Printf("---> clt %s del, break listen loop\n", clt.Id)
+				glog.V(2).Infof("clt %s del, break listen loop\n", clt.Id)
 				return
 			}
 		}
 	}(clt)
 
-	// fmt.Printf("new client %s to user %s\n", clt.Id, clt.User.Id)
+	glog.V(1).Infof("new client %s to user %s\n", clt.Id, clt.User.Id)
 	return clt
 }
 
@@ -82,7 +83,8 @@ type Client struct {
 }
 
 func (c *Client) Handshake() {
-	// fmt.Printf("clt %s handshake\n", c.Id)
+	glog.V(3).Infof("clt %s handshake\n", c.Id)
+
 	c.lastHandshake = time.Now().Unix()
 }
 

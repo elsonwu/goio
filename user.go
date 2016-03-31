@@ -1,6 +1,10 @@
 package goio
 
-import "time"
+import (
+	"time"
+
+	"github.com/golang/glog"
+)
 
 func NewUser(userId string) *User {
 	user := &User{
@@ -30,16 +34,15 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				// fmt.Printf("user %s has %d clients, received message from user %s client %s\n", user.Id, len(user.Clients), msg.CallerId, msg.ClientId)
+				glog.V(3).Infof("user %s has %d clients, received message from user %s client %s\n", user.Id, len(user.Clients), msg.CallerId, msg.ClientId)
 				for _, c := range user.Clients {
 					if c.Id == msg.ClientId {
-						// fmt.Printf("ignore message send from myself user[%s] client %s\n", c.User.Id, c.Id)
+						glog.V(3).Infof("ignore message send from myself user[%s] client %s\n", c.User.Id, c.Id)
 						continue
 					}
 
-					// fmt.Printf("sending message to user[%s] client %s - start \n", c.User.Id, c.Id)
 					c.receiveMessage <- msg
-					// fmt.Printf("sending message to user[%s] client %s - end \n", c.User.Id, c.Id)
+					glog.V(3).Infof("received message to user[%s] client %s\n", c.User.Id, c.Id)
 				}
 
 			case clt, ok := <-user.addClt:
@@ -48,7 +51,7 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				// fmt.Printf("#### user %s case addClt %s\n", user.Id, clt.Id)
+				glog.V(3).Infof("user %s case addClt %s\n", user.Id, clt.Id)
 				user.Clients[clt.Id] = clt
 
 			case clt, ok := <-user.delClt:
@@ -60,7 +63,8 @@ func NewUser(userId string) *User {
 				delete(user.Clients, clt.Id)
 
 				if len(user.Clients) == 0 {
-					// fmt.Printf("## user %s has 0 client, need to del\n", user.Id)
+
+					glog.V(3).Infof("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
 						select {
 						case r.delUser <- user:
@@ -83,7 +87,7 @@ func NewUser(userId string) *User {
 					user.dataMap = nil
 					user.rooms = nil
 
-					// fmt.Printf("user %s deleted, break its loop\n", user.Id)
+					glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
 					return
 				}
 			case room, ok := <-user.addRoom:
@@ -92,7 +96,7 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				// fmt.Println("user case addRoom")
+				glog.V(3).Infof("user case addRoom")
 				user.rooms[room.Id] = room
 
 			case room, ok := <-user.delRoom:
@@ -100,7 +104,7 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				// fmt.Println("user case delRoom")
+				glog.V(3).Infof("user case delRoom")
 				delete(user.rooms, room.Id)
 
 			case key, ok := <-user.getData:
@@ -108,14 +112,15 @@ func NewUser(userId string) *User {
 					return
 				}
 
-				// fmt.Println("user case getData")
+				glog.V(3).Infof("user case getData")
 				user.data <- user.dataMap[key]
 
 			case userData, ok := <-user.AddData:
 				if !ok {
 					return
 				}
-				// fmt.Println("user case AddData")
+
+				glog.V(3).Info("user case AddData")
 				user.dataMap[userData.Key] = userData.Val
 
 			case <-user.getRooms:
