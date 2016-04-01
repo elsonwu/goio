@@ -58,10 +58,11 @@ func NewClient(user *User) *Client {
 				clt.messages = make([]*Message, 0, 10)
 
 			case <-clt.close:
-				clt.User = nil
-				close(clt.receiveMessage)
-				close(clt.fetchMessages)
-				close(clt.msgs)
+				// wait for GC
+				// clt.User = nil
+				// close(clt.receiveMessage)
+				// close(clt.fetchMessages)
+				// close(clt.msgs)
 
 				glog.V(2).Infof("clt %s del, break listen loop\n", clt.Id)
 				return
@@ -87,11 +88,14 @@ type Client struct {
 
 func (c *Client) Handshake() {
 	glog.V(3).Infof("clt %s handshake\n", c.Id)
-
 	c.lastHandshake = time.Now().Unix()
 }
 
 func (c *Client) Msgs() []*Message {
-	c.fetchMessages <- struct{}{}
-	return <-c.msgs
+	select {
+	case c.fetchMessages <- struct{}{}:
+		return <-c.msgs
+	case <-time.After(time.Second):
+		return nil
+	}
 }

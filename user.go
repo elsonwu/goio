@@ -115,19 +115,20 @@ func NewUser(userId string) *User {
 				user.rs <- user.rooms
 
 			case <-user.close:
-				close(user.AddData)
-				close(user.addClt)
-				close(user.addRoom)
-				close(user.data)
-				close(user.delClt)
-				close(user.delRoom)
-				close(user.getData)
-				close(user.getRooms)
-				close(user.message)
-				close(user.rs)
-				user.Clients = nil
-				user.dataMap = nil
-				user.rooms = nil
+				// wait for GC
+				// close(user.AddData)
+				// close(user.addClt)
+				// close(user.addRoom)
+				// close(user.data)
+				// close(user.delClt)
+				// close(user.delRoom)
+				// close(user.getData)
+				// close(user.getRooms)
+				// close(user.message)
+				// close(user.rs)
+				// user.Clients = nil
+				// user.dataMap = nil
+				// user.rooms = nil
 
 				// break this loop
 				glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
@@ -159,11 +160,19 @@ type User struct {
 }
 
 func (u *User) GetData(key string) string {
-	u.getData <- key
-	return <-u.data
+	select {
+	case u.getData <- key:
+		return <-u.data
+	case <-time.After(time.Second):
+		return ""
+	}
 }
 
 func (u *User) Rooms() map[string]*Room {
-	u.getRooms <- struct{}{}
-	return <-u.rs
+	select {
+	case u.getRooms <- struct{}{}:
+		return <-u.rs
+	case <-time.After(time.Second):
+		return nil
+	}
 }

@@ -62,12 +62,13 @@ func NewRoom(roomId string) *Room {
 				room.userIds <- uids
 
 			case <-room.close:
-				room.users = nil
-				close(room.Message)
-				close(room.addUser)
-				close(room.delUser)
-				close(room.getUserIds)
-				close(room.userIds)
+				// wait for GC
+				// room.users = nil
+				// close(room.Message)
+				// close(room.addUser)
+				// close(room.delUser)
+				// close(room.getUserIds)
+				// close(room.userIds)
 
 				glog.V(3).Infof("room %s deleted, break its loop\n", room.Id)
 
@@ -97,6 +98,10 @@ type Room struct {
 }
 
 func (r *Room) UserIds() []string {
-	r.getUserIds <- struct{}{}
-	return <-r.userIds
+	select {
+	case r.getUserIds <- struct{}{}:
+		return <-r.userIds
+	case <-time.After(time.Second):
+		return nil
+	}
 }

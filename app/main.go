@@ -185,7 +185,10 @@ func main() {
 
 		clt := goio.Clients().Get(clientId)
 		if clt != nil && clt.User != nil {
-			clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}
+			select {
+			case clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}:
+			case <-time.After(time.Second):
+			}
 		}
 
 		ctx.String(204, "")
