@@ -20,8 +20,8 @@ func NewUsers() *users {
 			case u := <-us.addUser:
 				us.Users[u.Id] = u
 
+				// tell everyone this new client online
 				go func(u *User) {
-					// tell everyone this new client online
 					Clients().Message <- &Message{
 						EventName: "join",
 						CallerId:  u.Id,
@@ -31,8 +31,8 @@ func NewUsers() *users {
 			case u := <-us.delUser:
 				delete(us.Users, u.Id)
 
+				// tell everyone this user is offline
 				go func(u *User) {
-					// tell everyone this user is offline
 					Clients().Message <- &Message{
 						EventName: "leave",
 						CallerId:  u.Id,

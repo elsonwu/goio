@@ -1,46 +1,21 @@
 package goio
 
-import "time"
-
 func DelRoomUser(room *Room, user *User) {
-	select {
-	case room.delUser <- user:
-	case <-time.After(10 * time.Second):
-	}
-
-	select {
-	case user.delRoom <- room:
-	case <-time.After(10 * time.Second):
-	}
+	room.delUser <- user
+	user.delRoom <- room
 }
 
 func AddRoomUser(room *Room, user *User) {
-
-	select {
-	case room.addUser <- user:
-	case <-time.After(10 * time.Second):
-	}
-
-	select {
-	case user.addRoom <- room:
-	case <-time.After(10 * time.Second):
-	}
+	room.addUser <- user
+	user.addRoom <- room
 }
 
 func AddUserClt(user *User, clt *Client) {
 	Clients().addClt <- clt
-
-	select {
-	case user.addClt <- clt:
-	case <-time.After(10 * time.Second):
-	}
+	user.addClt <- clt
 }
 
 func DelUserClt(user *User, clt *Client) {
 	Clients().delClt <- clt
-
-	select {
-	case user.delClt <- clt:
-	case <-time.After(10 * time.Second):
-	}
+	user.delClt <- clt
 }

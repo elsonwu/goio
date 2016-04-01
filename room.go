@@ -17,6 +17,7 @@ func NewRoom(roomId string) *Room {
 
 		getUserIds: make(chan struct{}),
 		userIds:    make(chan []string),
+		close:      make(chan struct{}),
 	}
 
 	Rooms().addRoom <- room
@@ -35,30 +36,21 @@ func NewRoom(roomId string) *Room {
 				glog.V(3).Infof("room %s deleted user %s, still have %d users \n", room.Id, u.Id, len(room.users))
 				if len(room.users) == 0 {
 					Rooms().delRoom <- room
-					room.users = nil
 
-					close(room.Message)
-					close(room.addUser)
-					close(room.delUser)
-					close(room.getUserIds)
-					close(room.userIds)
-
-					glog.V(3).Infof("room %s deleted, break its loop\n", room.Id)
-
-					//stop this loop
-					return
+					go func(room *Room) {
+						// wait 1s to receive all message
+						time.Sleep(1 * time.Second)
+						close(room.close)
+					}(room)
 				}
 
 			case msg := <-room.Message:
 				glog.V(3).Infof("room %s received message from user %s client %s \n", room.Id, msg.CallerId, msg.ClientId)
-
 				for _, u := range room.users {
-					select {
-					case u.message <- msg:
-					case <-time.After(10 * time.Second):
-					}
-
-					glog.V(3).Infof("msg sent to user %s\n", u.Id)
+					go func(msg *Message) {
+						u.message <- msg
+						glog.V(3).Infof("msg sent to user %s\n", u.Id)
+					}(msg)
 				}
 
 			case <-room.getUserIds:
@@ -68,6 +60,20 @@ func NewRoom(roomId string) *Room {
 				}
 
 				room.userIds <- uids
+
+			case <-room.close:
+				room.users = nil
+				close(room.Message)
+				close(room.addUser)
+				close(room.delUser)
+				close(room.getUserIds)
+				close(room.userIds)
+
+				glog.V(3).Infof("room %s deleted, break its loop\n", room.Id)
+
+				//stop this loop
+				return
+
 			}
 		}
 
@@ -87,6 +93,7 @@ type Room struct {
 	userIds    chan []string
 	Message    chan *Message
 	lock       sync.RWMutex
+	close      chan struct{}
 }
 
 func (r *Room) UserIds() []string {

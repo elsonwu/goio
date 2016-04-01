@@ -121,7 +121,7 @@ func main() {
 			count, _ := strconv.Atoi(ctx.Param("num"))
 			glog.V(1).Infof("adding %d clients\n", count)
 
-			st := time.Now().Second()
+			st := time.Now().Unix()
 			for i := 1; i <= count; i++ {
 				userId := strconv.Itoa(i)
 				user := goio.Users().MustGet(userId)
@@ -137,7 +137,7 @@ func main() {
 				goio.AddRoomUser(room, user)
 			}
 
-			ctx.String(200, fmt.Sprintf("%d s", time.Now().Second()-st))
+			ctx.String(200, fmt.Sprintf("%d s", time.Now().Unix()-st))
 		})
 	}
 
@@ -185,12 +185,7 @@ func main() {
 
 		clt := goio.Clients().Get(clientId)
 		if clt != nil && clt.User != nil {
-			select {
-			case clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}:
-			case <-time.After(3 * time.Second):
-				//timeout, don't add data
-			}
-
+			clt.User.AddData <- goio.UserData{Key: key, Val: string(val)}
 		}
 
 		ctx.String(204, "")
@@ -311,12 +306,7 @@ func main() {
 					}
 
 					goio.AddRoomUser(r, clt.User)
-
-					select {
-					case r.Message <- msg:
-					case <-time.After(10 * time.Second):
-					}
-
+					r.Message <- msg
 				}
 
 			case "leave":
@@ -325,10 +315,7 @@ func main() {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
 						goio.DelRoomUser(r, clt.User)
-						select {
-						case r.Message <- msg:
-						case <-time.After(10 * time.Second):
-						}
+						r.Message <- msg
 					}
 				}
 			case "broadcast":
@@ -337,17 +324,11 @@ func main() {
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
-						select {
-						case r.Message <- msg:
-						case <-time.After(10 * time.Second):
-						}
+						r.Message <- msg
 					}
 				} else {
 					for _, r := range clt.User.Rooms() {
-						select {
-						case r.Message <- msg:
-						case <-time.After(10 * time.Second):
-						}
+						r.Message <- msg
 					}
 				}
 

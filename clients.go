@@ -19,10 +19,11 @@ func NewClients() *clients {
 	go func(clts *clients) {
 		for {
 			select {
-
 			case msg := <-clts.Message:
 				for _, c := range clts.Clients {
-					c.receiveMessage <- msg
+					go func(c *Client, msg *Message) {
+						c.receiveMessage <- msg
+					}(c, msg)
 				}
 			case c := <-clts.addClt:
 				clts.Clients[c.Id] = c

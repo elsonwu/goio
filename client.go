@@ -37,6 +37,9 @@ func NewClient(user *User) *Client {
 			}
 
 			DelUserClt(clt.User, clt)
+
+			// wait 1s to receive all channel message
+			time.Sleep(1 * time.Second)
 			close(clt.close)
 
 			return

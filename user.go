@@ -22,6 +22,7 @@ func NewUser(userId string) *User {
 		rs:       make(chan map[string]*Room),
 		AddData:  make(chan UserData),
 		getData:  make(chan string),
+		close:    make(chan struct{}),
 	}
 
 	Users().addUser <- user
@@ -66,29 +67,16 @@ func NewUser(userId string) *User {
 
 					glog.V(3).Infof("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
-						select {
-						case r.delUser <- user:
-						case <-time.After(10 * time.Second):
-						}
+						r.delUser <- user
 					}
 
 					Users().delUser <- user
-					close(user.AddData)
-					close(user.addClt)
-					close(user.addRoom)
-					close(user.data)
-					close(user.delClt)
-					close(user.delRoom)
-					close(user.getData)
-					close(user.getRooms)
-					close(user.message)
-					close(user.rs)
-					user.Clients = nil
-					user.dataMap = nil
-					user.rooms = nil
 
-					glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
-					return
+					go func() {
+						// wait 1s to receive all messages
+						time.Sleep(1 * time.Second)
+						close(user.close)
+					}()
 				}
 			case room, ok := <-user.addRoom:
 
@@ -125,6 +113,25 @@ func NewUser(userId string) *User {
 
 			case <-user.getRooms:
 				user.rs <- user.rooms
+
+			case <-user.close:
+				close(user.AddData)
+				close(user.addClt)
+				close(user.addRoom)
+				close(user.data)
+				close(user.delClt)
+				close(user.delRoom)
+				close(user.getData)
+				close(user.getRooms)
+				close(user.message)
+				close(user.rs)
+				user.Clients = nil
+				user.dataMap = nil
+				user.rooms = nil
+
+				// break this loop
+				glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
+				return
 			}
 		}
 
@@ -148,6 +155,7 @@ type User struct {
 	data     chan string
 	getData  chan string
 	dataMap  map[string]string
+	close    chan struct{}
 }
 
 func (u *User) GetData(key string) string {
