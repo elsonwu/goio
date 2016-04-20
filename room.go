@@ -18,6 +18,7 @@ func NewRoom(roomId string) *Room {
 		getUserIds: make(chan struct{}),
 		userIds:    make(chan []string),
 		close:      make(chan struct{}),
+		closed:     false,
 	}
 
 	Rooms().addRoom <- room
@@ -70,6 +71,7 @@ func NewRoom(roomId string) *Room {
 				// close(room.getUserIds)
 				// close(room.userIds)
 
+				room.closed = true
 				glog.V(3).Infof("room %s deleted, break its loop\n", room.Id)
 
 				//stop this loop
@@ -95,6 +97,7 @@ type Room struct {
 	Message    chan *Message
 	lock       sync.RWMutex
 	close      chan struct{}
+	closed     bool
 }
 
 func (r *Room) UserIds() []string {

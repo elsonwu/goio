@@ -23,6 +23,7 @@ func NewUser(userId string) *User {
 		AddData:  make(chan UserData),
 		getData:  make(chan string),
 		close:    make(chan struct{}),
+		closed:   false,
 	}
 
 	Users().addUser <- user
@@ -64,6 +65,7 @@ func NewUser(userId string) *User {
 				delete(user.Clients, clt.Id)
 
 				if len(user.Clients) == 0 {
+					user.closed = true
 
 					glog.V(3).Infof("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
@@ -130,6 +132,7 @@ func NewUser(userId string) *User {
 				// user.dataMap = nil
 				// user.rooms = nil
 
+				user.closed = true
 				// break this loop
 				glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
 				return
@@ -157,6 +160,7 @@ type User struct {
 	getData  chan string
 	dataMap  map[string]string
 	close    chan struct{}
+	closed   bool
 }
 
 func (u *User) GetData(key string) string {

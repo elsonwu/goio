@@ -41,7 +41,11 @@ func NewUsers() *users {
 
 			case userId := <-us.getUser:
 				user, _ := us.Users[userId]
-				us.user <- user
+				if user != nil && user.closed {
+					us.user <- nil
+				} else {
+					us.user <- user
+				}
 
 			case <-us.getCount:
 				us.count <- len(us.Users)

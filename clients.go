@@ -29,11 +29,16 @@ func NewClients() *clients {
 				clts.Clients[c.Id] = c
 
 			case c := <-clts.delClt:
-				delete(clts.Clients, c.Id)
+				clts.deleteClient(c.Id)
 
 			case clientId := <-clts.getClt:
 				client, _ := clts.Clients[clientId]
-				clts.clt <- client
+				if client != nil && client.closed {
+					clts.deleteClient(clientId)
+					clts.clt <- nil
+				} else {
+					clts.clt <- client
+				}
 
 			case <-clts.getCount:
 				clts.count <- len(clts.Clients)
@@ -64,6 +69,10 @@ type clients struct {
 func (c *clients) Count() int {
 	c.getCount <- struct{}{}
 	return <-c.count
+}
+
+func (c *clients) deleteClient(cltId string) {
+	delete(c.Clients, cltId)
 }
 
 func (c *clients) Get(clientId string) *Client {

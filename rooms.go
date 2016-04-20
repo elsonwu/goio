@@ -21,11 +21,17 @@ func NewRooms() *rooms {
 				rs.rooms[r.Id] = r
 
 			case r := <-rs.delRoom:
-				delete(rs.rooms, r.Id)
+				r.closed = true
+				rs.deleteRoom(r.Id)
 
 			case roomId := <-rs.getRoom:
 				room, _ := rs.rooms[roomId]
-				rs.room <- room
+				if room != nil && room.closed {
+					rs.deleteRoom(roomId)
+					rs.room <- nil
+				} else {
+					rs.room <- room
+				}
 
 			case <-rs.getCount:
 				rs.count <- len(rs.rooms)
@@ -52,6 +58,10 @@ type rooms struct {
 func (r *rooms) Count() int {
 	r.getCount <- struct{}{}
 	return <-r.count
+}
+
+func (r *rooms) deleteRoom(roomId string) {
+	delete(r.rooms, roomId)
 }
 
 func (r *rooms) Get(roomId string) *Room {

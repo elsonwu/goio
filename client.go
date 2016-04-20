@@ -20,6 +20,7 @@ func NewClient(user *User) *Client {
 		receiveMessage: make(chan *Message),
 		messages:       make([]*Message, 0, 10),
 		close:          make(chan struct{}),
+		closed:         false,
 		fetchMessages:  make(chan struct{}),
 		msgs:           make(chan []*Message),
 		lastHandshake:  time.Now().Unix(),
@@ -40,6 +41,7 @@ func NewClient(user *User) *Client {
 
 			// wait 1s to receive all channel message
 			time.Sleep(1 * time.Second)
+			clt.closed = true
 			close(clt.close)
 
 			return
@@ -64,6 +66,7 @@ func NewClient(user *User) *Client {
 				// close(clt.fetchMessages)
 				// close(clt.msgs)
 
+				clt.closed = true
 				glog.V(2).Infof("clt %s del, break listen loop\n", clt.Id)
 				return
 			}
@@ -81,6 +84,7 @@ type Client struct {
 	messages       []*Message
 	fetchMessages  chan struct{}
 	close          chan struct{}
+	closed         bool
 	msgs           chan []*Message
 	lastHandshake  int64
 	lock           sync.RWMutex
