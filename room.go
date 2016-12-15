@@ -1,24 +1,19 @@
 package goio
 
-import (
-	"time"
-
-	"github.com/golang/glog"
-)
+import "github.com/golang/glog"
 
 func NewRoom(roomId string) *Room {
 	room := &Room{
-		Id:      roomId,
-		users:   make(map[string]*User),
-		addUser: make(chan *User),
-		delUser: make(chan *User),
-		Message: make(chan *Message),
-
+		Id:         roomId,
+		users:      make(map[string]*User),
+		addUser:    make(chan *User),
+		delUser:    make(chan *User),
+		message:    make(chan *Message),
 		getUserIds: make(chan chan []string),
-		close:      make(chan struct{}),
+		died:       false,
 	}
 
-	Rooms().addRoom <- room
+	Rooms().AddRoom(room)
 
 	go func(room *Room) {
 		for {
@@ -33,20 +28,22 @@ func NewRoom(roomId string) *Room {
 
 				glog.V(3).Infof("room %s deleted user %s, still have %d users \n", room.Id, u.Id, len(room.users))
 				if len(room.users) == 0 {
-					Rooms().delRoom <- room
-
-					go func(room *Room) {
-						// wait 1s to receive all message
-						time.Sleep(1 * time.Second)
-						close(room.close)
-					}(room)
+					Rooms().DelRoom(room)
+					room.died = true
+					return
 				}
 
-			case msg := <-room.Message:
+			case msg := <-room.message:
+				if room.died {
+					continue
+				}
+
 				glog.V(3).Infof("room %s received message from user %s client %s \n", room.Id, msg.CallerId, msg.ClientId)
 				for _, u := range room.users {
-					u.message <- msg
-					glog.V(3).Infof("msg sent to user %s\n", u.Id)
+					if !u.died {
+						u.AddMessage(msg)
+						glog.V(3).Infof("msg sent to user %s\n", u.Id)
+					}
 				}
 
 			case userIds := <-room.getUserIds:
@@ -56,14 +53,6 @@ func NewRoom(roomId string) *Room {
 				}
 
 				userIds <- uids
-
-			case <-room.close:
-
-				glog.V(3).Infof("room %s deleted, break its loop\n", room.Id)
-
-				//stop this loop
-				return
-
 			}
 		}
 
@@ -80,11 +69,39 @@ type Room struct {
 	addUser    chan *User
 	delUser    chan *User
 	getUserIds chan chan []string
-	Message    chan *Message
-	close      chan struct{}
+	message    chan *Message
+	died       bool
+}
+
+func (r *Room) AddMessage(msg *Message) {
+	if r.died {
+		return
+	}
+
+	r.message <- msg
+}
+
+func (r *Room) AddUser(u *User) {
+	if r.died {
+		return
+	}
+
+	r.addUser <- u
+}
+
+func (r *Room) DelUser(u *User) {
+	if r.died {
+		return
+	}
+
+	r.delUser <- u
 }
 
 func (r *Room) UserIds() []string {
+	if r.died {
+		return nil
+	}
+
 	userIds := make(chan []string)
 	r.getUserIds <- userIds
 	defer close(userIds)

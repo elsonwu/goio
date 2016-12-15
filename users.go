@@ -62,16 +62,28 @@ type users struct {
 	getCount chan chan int
 }
 
-func (r *users) Count() int {
+func (us *users) AddUser(u *User) {
+	if u.died {
+		return
+	}
+
+	us.addUser <- u
+}
+
+func (us *users) DelUser(u *User) {
+	us.delUser <- u
+}
+
+func (us *users) Count() int {
 	counter := make(chan int)
-	r.getCount <- counter
+	us.getCount <- counter
 	defer close(counter)
 	return <-counter
 }
 
-func (r *users) Get(userId string) *User {
+func (us *users) Get(userId string) *User {
 	user := make(chan *User)
-	r.getUser <- userGetter{
+	us.getUser <- userGetter{
 		userId: userId,
 		user:   user,
 	}
@@ -79,8 +91,8 @@ func (r *users) Get(userId string) *User {
 	return <-user
 }
 
-func (r *users) MustGet(userId string) *User {
-	u := r.Get(userId)
+func (us *users) MustGet(userId string) *User {
+	u := us.Get(userId)
 	if u == nil {
 		u = NewUser(userId)
 	}

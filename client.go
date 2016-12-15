@@ -18,7 +18,8 @@ func NewClient(user *User) *Client {
 		Id:        NewClientId(),
 		User:      user,
 		messages:  make([]*Message, 0, 10),
-		Handshake: make(chan bool),
+		handshake: make(chan bool),
+		died:      false,
 	}
 
 	AddUserClt(user, clt)
@@ -27,12 +28,13 @@ func NewClient(user *User) *Client {
 	go func(clt *Client) {
 		for {
 			select {
-			case <-clt.Handshake:
+			case <-clt.handshake:
 				glog.V(2).Infof("client " + clt.Id + " handshake")
 				// skip this waiting
 
 			case <-time.After(time.Duration(LifeCycle) * time.Second):
 				DelUserClt(clt.User, clt)
+				clt.died = true
 				return
 			}
 		}
@@ -45,21 +47,25 @@ type Client struct {
 	Id        string
 	User      *User
 	messages  []*Message
-	Handshake chan bool
+	handshake chan bool
 	lock      sync.RWMutex
+	died      bool
 }
 
 func (c *Client) AddMessage(msg *Message) {
+	if c.died {
+		return
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.Handshake <- true
 	c.messages = append(c.messages, msg)
 }
 
 func (c *Client) ReadMessages() []*Message {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.Handshake <- true
+	c.handshake <- true
 	msgs := c.messages
 	c.messages = make([]*Message, 0, 10)
 	return msgs

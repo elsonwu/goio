@@ -15,7 +15,7 @@ func NewClients() *clients {
 			select {
 			case msg := <-clts.Message:
 				for _, c := range clts.Clients {
-					c.AddMessage(msg)
+					go c.AddMessage(msg)
 				}
 
 			case c := <-clts.addClt:
@@ -27,6 +27,7 @@ func NewClients() *clients {
 			case getter := <-clts.getClt:
 				clt, _ := clts.Clients[getter.clientId]
 				getter.client <- clt
+
 			case counter := <-clts.getCount:
 				counter <- len(clts.Clients)
 			}
@@ -58,6 +59,18 @@ func (c *clients) Count() int {
 
 	defer close(counter)
 	return <-counter
+}
+
+func (c *clients) AddClt(clt *Client) {
+	if clt.died {
+		return
+	}
+
+	c.addClt <- clt
+}
+
+func (c *clients) DelClt(clt *Client) {
+	c.delClt <- clt
 }
 
 func (c *clients) Get(clientId string) *Client {

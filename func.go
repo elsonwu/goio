@@ -1,21 +1,21 @@
 package goio
 
 func DelRoomUser(room *Room, user *User) {
-	room.delUser <- user
-	user.delRoom <- room
+	room.DelUser(user)
+	user.DelRoom(room)
 }
 
 func AddRoomUser(room *Room, user *User) {
-	room.addUser <- user
-	user.addRoom <- room
+	room.AddUser(user)
+	user.AddRoom(room)
 }
 
 func AddUserClt(user *User, clt *Client) {
-	Clients().addClt <- clt
-	user.addClt <- clt
+	Clients().AddClt(clt)
+	user.AddClt(clt)
 }
 
 func DelUserClt(user *User, clt *Client) {
-	Clients().delClt <- clt
-	user.delClt <- clt
+	Clients().DelClt(clt)
+	user.DelClt(clt)
 }

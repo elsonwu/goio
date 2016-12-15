@@ -44,6 +44,18 @@ type rooms struct {
 	getCount chan chan int
 }
 
+func (r *rooms) AddRoom(room *Room) {
+	if room.died {
+		return
+	}
+
+	r.addRoom <- room
+}
+
+func (r *rooms) DelRoom(room *Room) {
+	r.delRoom <- room
+}
+
 func (r *rooms) Count() int {
 	counter := make(chan int)
 	r.getCount <- counter
@@ -59,4 +71,13 @@ func (r *rooms) Get(roomId string) *Room {
 	}
 	defer close(room)
 	return <-room
+}
+
+func (r *rooms) MustGet(roomId string) *Room {
+	room := r.Get(roomId)
+	if room == nil {
+		room = NewRoom(roomId)
+	}
+
+	return room
 }

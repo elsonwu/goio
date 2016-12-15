@@ -21,17 +21,17 @@ func NewUser(userId string) *User {
 		getRooms: make(chan chan map[string]*Room),
 		AddData:  make(chan UserData),
 		getData:  make(chan string),
-		close:    make(chan struct{}),
+		died:     false,
 	}
 
-	Users().addUser <- user
+	Users().AddUser(user)
 
 	go func(user *User) {
 		for {
 			select {
-			case msg, ok := <-user.message:
-				if !ok {
-					return
+			case msg := <-user.message:
+				if user.died {
+					continue
 				}
 
 				glog.V(3).Infof("user %s has %d clients, received message from user %s client %s\n", user.Id, len(user.Clients), msg.CallerId, msg.ClientId)
@@ -41,81 +41,45 @@ func NewUser(userId string) *User {
 						continue
 					}
 
-					c.AddMessage(msg)
+					go c.AddMessage(msg)
 					glog.V(3).Infof("received message to user[%s] client %s\n", c.User.Id, c.Id)
 				}
 
-			case clt, ok := <-user.addClt:
-
-				if !ok {
-					return
-				}
-
+			case clt := <-user.addClt:
 				glog.V(3).Infof("user %s case addClt %s\n", user.Id, clt.Id)
 				user.Clients[clt.Id] = clt
 
-			case clt, ok := <-user.delClt:
-
-				if !ok {
-					return
-				}
-
+			case clt := <-user.delClt:
 				delete(user.Clients, clt.Id)
 
 				if len(user.Clients) == 0 {
-
 					glog.V(3).Infof("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
-						r.delUser <- user
+						r.DelUser(user)
 					}
 
-					Users().delUser <- user
-
-					go func() {
-						// wait 1s to receive all messages
-						time.Sleep(1 * time.Second)
-						close(user.close)
-					}()
-				}
-			case room, ok := <-user.addRoom:
-				if !ok {
+					Users().DelUser(user)
+					user.died = true
 					return
 				}
-
+			case room := <-user.addRoom:
 				glog.V(3).Infof("user case addRoom")
 				user.rooms[room.Id] = room
 
-			case room, ok := <-user.delRoom:
-				if !ok {
-					return
-				}
-
+			case room := <-user.delRoom:
 				glog.V(3).Infof("user case delRoom")
 				delete(user.rooms, room.Id)
 
-			case key, ok := <-user.getData:
-				if !ok {
-					return
-				}
-
+			case key := <-user.getData:
 				glog.V(3).Infof("user case getData")
 				user.data <- user.dataMap[key]
 
-			case userData, ok := <-user.AddData:
-				if !ok {
-					return
-				}
-
+			case userData := <-user.AddData:
 				glog.V(3).Info("user case AddData")
 				user.dataMap[userData.Key] = userData.Val
 
 			case rooms := <-user.getRooms:
 				rooms <- user.rooms
-
-			case <-user.close:
-				// break this loop
-				glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
-				return
 			}
 		}
 
@@ -138,10 +102,22 @@ type User struct {
 	data     chan string
 	getData  chan string
 	dataMap  map[string]string
-	close    chan struct{}
+	died     bool
+}
+
+func (u *User) AddMessage(msg *Message) {
+	if u.died {
+		return
+	}
+
+	u.message <- msg
 }
 
 func (u *User) GetData(key string) string {
+	if u.died {
+		return ""
+	}
+
 	select {
 	case u.getData <- key:
 		return <-u.data
@@ -150,7 +126,43 @@ func (u *User) GetData(key string) string {
 	}
 }
 
+func (u *User) AddClt(clt *Client) {
+	if u.died || clt.died {
+		return
+	}
+
+	u.addClt <- clt
+}
+
+func (u *User) DelClt(clt *Client) {
+	if u.died {
+		return
+	}
+
+	u.delClt <- clt
+}
+
+func (u *User) AddRoom(room *Room) {
+	if u.died || room.died {
+		return
+	}
+
+	u.addRoom <- room
+}
+
+func (u *User) DelRoom(room *Room) {
+	if u.died {
+		return
+	}
+
+	u.delRoom <- room
+}
+
 func (u *User) Rooms() map[string]*Room {
+	if u.died {
+		return make(map[string]*Room)
+	}
+
 	rooms := make(chan map[string]*Room)
 	u.getRooms <- rooms
 	defer close(rooms)

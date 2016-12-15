@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,7 +40,7 @@ func main() {
 	if *flagDebug {
 		go func() {
 			for {
-				time.Sleep(1 * time.Second)
+				time.Sleep(3 * time.Second)
 				log.Printf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count())
 			}
 		}()
@@ -66,6 +67,28 @@ func main() {
 			}
 		}
 	})
+
+	if *flagDebug {
+		m.GET("/test", func(ctx *gin.Context) {
+			var userId string
+			var roomId string
+			for i := 0; i < 10000; i += 1 {
+				userId = strconv.Itoa(i % 100)
+				user := goio.Users().MustGet(userId)
+				if user == nil {
+					fmt.Printf("user %#v\n", user)
+					return
+				}
+
+				client := goio.NewClient(user)
+
+				roomId = strconv.Itoa(i % 100)
+				room := goio.Rooms().MustGet(roomId)
+
+				goio.AddRoomUser(room, client.User)
+			}
+		})
+	}
 
 	m.GET("/count", func(ctx *gin.Context) {
 		ctx.String(200, fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count()))
@@ -222,13 +245,9 @@ func main() {
 			case "join":
 				glog.V(1).Infof("msg event - join\n")
 				if msg.RoomId != "" {
-					r := goio.Rooms().Get(msg.RoomId)
-					if r == nil {
-						r = goio.NewRoom(msg.RoomId)
-					}
-
+					r := goio.Rooms().MustGet(msg.RoomId)
 					goio.AddRoomUser(r, clt.User)
-					r.Message <- msg
+					r.AddMessage(msg)
 				}
 
 			case "leave":
@@ -237,7 +256,7 @@ func main() {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
 						goio.DelRoomUser(r, clt.User)
-						r.Message <- msg
+						r.AddMessage(msg)
 					}
 				}
 			case "broadcast":
@@ -246,11 +265,11 @@ func main() {
 				if msg.RoomId != "" {
 					r := goio.Rooms().Get(msg.RoomId)
 					if r != nil {
-						r.Message <- msg
+						r.AddMessage(msg)
 					}
 				} else {
 					for _, r := range clt.User.Rooms() {
-						r.Message <- msg
+						r.AddMessage(msg)
 					}
 				}
 
