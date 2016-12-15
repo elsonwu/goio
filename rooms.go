@@ -1,18 +1,12 @@
 package goio
 
-import "sync"
-
 func NewRooms() *rooms {
 	rs := new(rooms)
 	rs.rooms = make(map[string]*Room)
 	rs.addRoom = make(chan *Room)
 	rs.delRoom = make(chan *Room)
-
-	rs.getRoom = make(chan string)
-	rs.room = make(chan *Room)
-
-	rs.getCount = make(chan struct{})
-	rs.count = make(chan int)
+	rs.getRoom = make(chan roomGetter)
+	rs.getCount = make(chan chan int)
 
 	go func(rs *rooms) {
 		for {
@@ -21,20 +15,14 @@ func NewRooms() *rooms {
 				rs.rooms[r.Id] = r
 
 			case r := <-rs.delRoom:
-				r.closed = true
-				rs.deleteRoom(r.Id)
+				delete(rs.rooms, r.Id)
 
-			case roomId := <-rs.getRoom:
-				room, _ := rs.rooms[roomId]
-				if room != nil && room.closed {
-					rs.deleteRoom(roomId)
-					rs.room <- nil
-				} else {
-					rs.room <- room
-				}
+			case roomGetter := <-rs.getRoom:
+				r, _ := rs.rooms[roomGetter.roomId]
+				roomGetter.room <- r
 
-			case <-rs.getCount:
-				rs.count <- len(rs.rooms)
+			case counter := <-rs.getCount:
+				counter <- len(rs.rooms)
 			}
 		}
 
@@ -43,28 +31,32 @@ func NewRooms() *rooms {
 	return rs
 }
 
-type rooms struct {
-	rooms   map[string]*Room
-	addRoom chan *Room
-	delRoom chan *Room
-	room    chan *Room
-	getRoom chan string
+type roomGetter struct {
+	roomId string
+	room   chan *Room
+}
 
-	count    chan int
-	getCount chan struct{}
-	lock     sync.RWMutex
+type rooms struct {
+	rooms    map[string]*Room
+	addRoom  chan *Room
+	delRoom  chan *Room
+	getRoom  chan roomGetter
+	getCount chan chan int
 }
 
 func (r *rooms) Count() int {
-	r.getCount <- struct{}{}
-	return <-r.count
-}
-
-func (r *rooms) deleteRoom(roomId string) {
-	delete(r.rooms, roomId)
+	counter := make(chan int)
+	r.getCount <- counter
+	defer close(counter)
+	return <-counter
 }
 
 func (r *rooms) Get(roomId string) *Room {
-	r.getRoom <- roomId
-	return <-r.room
+	room := make(chan *Room)
+	r.getRoom <- roomGetter{
+		roomId: roomId,
+		room:   room,
+	}
+	defer close(room)
+	return <-room
 }

@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -67,79 +66,6 @@ func main() {
 			}
 		}
 	})
-
-	if *flagDebug {
-
-		m.GET("/test/gc", func(ctx *gin.Context) {
-			runtime.GC()
-			ctx.String(200, "completed")
-		})
-
-		m.GET("/test/message", func(ctx *gin.Context) {
-			userId1 := "u1"
-			user1 := goio.Users().MustGet(userId1)
-			clt1 := goio.NewClient(user1)
-
-			roomId := "r1"
-			room := goio.Rooms().Get(roomId)
-			if room == nil {
-				room = goio.NewRoom(roomId)
-			}
-
-			goio.AddRoomUser(room, user1)
-
-			go func(clt1 *goio.Client) {
-				for {
-					msgs := clt1.Msgs()
-					if len(msgs) == 0 {
-						time.Sleep(3 * time.Second)
-						continue
-					}
-
-					glog.V(1).Infof("user %s clt %s received message %#v \n", clt1.User.Id, clt1.Id, msgs)
-				}
-			}(clt1)
-
-			userId2 := "u2"
-			user2 := goio.Users().MustGet(userId2)
-			clt2 := goio.NewClient(user2)
-
-			msg := &goio.Message{}
-			msg.CallerId = userId2
-			msg.ClientId = clt2.Id
-			msg.EventName = "join"
-			msg.RoomId = roomId
-			msg.Data = `{"val":"this is a test"}`
-
-			room.Message <- msg
-
-			ctx.String(200, "completed")
-		})
-
-		m.GET("/test/client/:num", func(ctx *gin.Context) {
-
-			count, _ := strconv.Atoi(ctx.Param("num"))
-			glog.V(1).Infof("adding %d clients\n", count)
-
-			st := time.Now().Unix()
-			for i := 1; i <= count; i++ {
-				userId := strconv.Itoa(i)
-				user := goio.Users().MustGet(userId)
-
-				goio.NewClient(user)
-
-				roomId := strconv.Itoa(i % 1000)
-				room := goio.Rooms().Get(roomId)
-				if room == nil {
-					room = goio.NewRoom(roomId)
-				}
-
-				goio.AddRoomUser(room, user)
-			}
-
-			ctx.String(200, fmt.Sprintf("%d s", time.Now().Unix()-st))
-		})
-	}
 
 	m.GET("/count", func(ctx *gin.Context) {
 		ctx.String(200, fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count()))
@@ -247,10 +173,7 @@ func main() {
 
 		for i, wait := 0, 1; i*wait <= *flagClientMessageTimeout; i++ {
 
-			// keep this client alive
-			clt.Handshake()
-
-			msgs := clt.Msgs()
+			msgs := clt.ReadMessages()
 			if len(msgs) == 0 {
 				time.Sleep(time.Duration(wait) * time.Second)
 				continue
@@ -287,10 +210,6 @@ func main() {
 
 		msg.CallerId = clt.User.Id
 		msg.ClientId = clt.Id
-
-		clt.Handshake()
-		// we handshake again after it finished no matter timeout or ok
-		defer clt.Handshake()
 
 		go func(msg *goio.Message, clt *goio.Client) {
 			if *flagDebug {

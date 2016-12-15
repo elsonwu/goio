@@ -18,12 +18,10 @@ func NewUser(userId string) *User {
 		delRoom:  make(chan *Room),
 		dataMap:  make(map[string]string),
 		data:     make(chan string),
-		getRooms: make(chan struct{}),
-		rs:       make(chan map[string]*Room),
+		getRooms: make(chan chan map[string]*Room),
 		AddData:  make(chan UserData),
 		getData:  make(chan string),
 		close:    make(chan struct{}),
-		closed:   false,
 	}
 
 	Users().addUser <- user
@@ -43,7 +41,7 @@ func NewUser(userId string) *User {
 						continue
 					}
 
-					c.receiveMessage <- msg
+					c.AddMessage(msg)
 					glog.V(3).Infof("received message to user[%s] client %s\n", c.User.Id, c.Id)
 				}
 
@@ -65,7 +63,6 @@ func NewUser(userId string) *User {
 				delete(user.Clients, clt.Id)
 
 				if len(user.Clients) == 0 {
-					user.closed = true
 
 					glog.V(3).Infof("## user %s has 0 client, need to del\n", user.Id)
 					for _, r := range user.rooms {
@@ -81,7 +78,6 @@ func NewUser(userId string) *User {
 					}()
 				}
 			case room, ok := <-user.addRoom:
-
 				if !ok {
 					return
 				}
@@ -113,26 +109,10 @@ func NewUser(userId string) *User {
 				glog.V(3).Info("user case AddData")
 				user.dataMap[userData.Key] = userData.Val
 
-			case <-user.getRooms:
-				user.rs <- user.rooms
+			case rooms := <-user.getRooms:
+				rooms <- user.rooms
 
 			case <-user.close:
-				// wait for GC
-				// close(user.AddData)
-				// close(user.addClt)
-				// close(user.addRoom)
-				// close(user.data)
-				// close(user.delClt)
-				// close(user.delRoom)
-				// close(user.getData)
-				// close(user.getRooms)
-				// close(user.message)
-				// close(user.rs)
-				// user.Clients = nil
-				// user.dataMap = nil
-				// user.rooms = nil
-
-				user.closed = true
 				// break this loop
 				glog.V(3).Infof("user %s deleted, break its loop\n", user.Id)
 				return
@@ -154,13 +134,11 @@ type User struct {
 	addRoom  chan *Room
 	delRoom  chan *Room
 	AddData  chan UserData
-	getRooms chan struct{}
-	rs       chan map[string]*Room
+	getRooms chan chan map[string]*Room
 	data     chan string
 	getData  chan string
 	dataMap  map[string]string
 	close    chan struct{}
-	closed   bool
 }
 
 func (u *User) GetData(key string) string {
@@ -173,10 +151,8 @@ func (u *User) GetData(key string) string {
 }
 
 func (u *User) Rooms() map[string]*Room {
-	select {
-	case u.getRooms <- struct{}{}:
-		return <-u.rs
-	case <-time.After(time.Second):
-		return nil
-	}
+	rooms := make(chan map[string]*Room)
+	u.getRooms <- rooms
+	defer close(rooms)
+	return <-rooms
 }

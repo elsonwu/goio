@@ -15,91 +15,52 @@ func NewClientId() string {
 
 func NewClient(user *User) *Client {
 	clt := &Client{
-		Id:             NewClientId(),
-		User:           user,
-		receiveMessage: make(chan *Message),
-		messages:       make([]*Message, 0, 10),
-		close:          make(chan struct{}),
-		closed:         false,
-		fetchMessages:  make(chan struct{}),
-		msgs:           make(chan []*Message),
-		lastHandshake:  time.Now().Unix(),
+		Id:        NewClientId(),
+		User:      user,
+		messages:  make([]*Message, 0, 10),
+		Handshake: make(chan bool),
 	}
 
 	AddUserClt(user, clt)
-
-	// check for client life cycle
-	go func(clt *Client) {
-		for {
-			time.Sleep(time.Duration(LifeCycle) * time.Second) // never timeout if any message come
-
-			if time.Now().Unix()-clt.lastHandshake < LifeCycle {
-				continue
-			}
-
-			DelUserClt(clt.User, clt)
-
-			// wait 1s to receive all channel message
-			time.Sleep(1 * time.Second)
-			clt.closed = true
-			close(clt.close)
-
-			return
-		}
-	}(clt)
 
 	// listen for client message
 	go func(clt *Client) {
 		for {
 			select {
-			case msg := <-clt.receiveMessage:
-				clt.messages = append(clt.messages, msg)
+			case <-clt.Handshake:
+				glog.V(2).Infof("client " + clt.Id + " handshake")
+				// skip this waiting
 
-			case <-clt.fetchMessages:
-				clt.msgs <- clt.messages
-				clt.messages = make([]*Message, 0, 10)
-
-			case <-clt.close:
-				// wait for GC
-				// clt.User = nil
-				// close(clt.receiveMessage)
-				// close(clt.fetchMessages)
-				// close(clt.msgs)
-
-				clt.closed = true
-				glog.V(2).Infof("clt %s del, break listen loop\n", clt.Id)
+			case <-time.After(time.Duration(LifeCycle) * time.Second):
+				DelUserClt(clt.User, clt)
 				return
 			}
 		}
 	}(clt)
 
-	glog.V(1).Infof("new client %s to user %s\n", clt.Id, clt.User.Id)
 	return clt
 }
 
 type Client struct {
-	Id             string
-	User           *User
-	receiveMessage chan *Message
-	messages       []*Message
-	fetchMessages  chan struct{}
-	close          chan struct{}
-	closed         bool
-	msgs           chan []*Message
-	lastHandshake  int64
-	lock           sync.RWMutex
+	Id        string
+	User      *User
+	messages  []*Message
+	Handshake chan bool
+	lock      sync.RWMutex
 }
 
-func (c *Client) Handshake() {
-	glog.V(3).Infof("clt %s handshake\n", c.Id)
-	c.lastHandshake = time.Now().Unix()
+func (c *Client) AddMessage(msg *Message) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.Handshake <- true
+	c.messages = append(c.messages, msg)
 }
 
-func (c *Client) Msgs() []*Message {
-	select {
-	case c.fetchMessages <- struct{}{}:
-		return <-c.msgs
-	case <-time.After(time.Second):
-		return nil
-	}
+func (c *Client) ReadMessages() []*Message {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.Handshake <- true
+	msgs := c.messages
+	c.messages = make([]*Message, 0, 10)
+	return msgs
 }

@@ -1,18 +1,14 @@
 package goio
 
-import "sync"
-
 func NewUsers() *users {
 	us := new(users)
 	us.Users = make(map[string]*User)
 	us.addUser = make(chan *User)
 	us.delUser = make(chan *User)
 
-	us.getUser = make(chan string)
-	us.user = make(chan *User)
+	us.getUser = make(chan userGetter)
 
-	us.getCount = make(chan struct{})
-	us.count = make(chan int)
+	us.getCount = make(chan chan int)
 
 	go func(us *users) {
 		for {
@@ -39,16 +35,12 @@ func NewUsers() *users {
 					}
 				}(u)
 
-			case userId := <-us.getUser:
-				user, _ := us.Users[userId]
-				if user != nil && user.closed {
-					us.user <- nil
-				} else {
-					us.user <- user
-				}
+			case userGetter := <-us.getUser:
+				user, _ := us.Users[userGetter.userId]
+				userGetter.user <- user
 
-			case <-us.getCount:
-				us.count <- len(us.Users)
+			case counter := <-us.getCount:
+				counter <- len(us.Users)
 			}
 		}
 
@@ -57,27 +49,34 @@ func NewUsers() *users {
 	return us
 }
 
+type userGetter struct {
+	userId string
+	user   chan *User
+}
+
 type users struct {
-	Users   map[string]*User
-	addUser chan *User
-	delUser chan *User
-
-	getUser chan string
-	user    chan *User // after GetUser
-
-	getCount chan struct{}
-	count    chan int
-	lock     sync.RWMutex
+	Users    map[string]*User
+	addUser  chan *User
+	delUser  chan *User
+	getUser  chan userGetter
+	getCount chan chan int
 }
 
 func (r *users) Count() int {
-	r.getCount <- struct{}{}
-	return <-r.count
+	counter := make(chan int)
+	r.getCount <- counter
+	defer close(counter)
+	return <-counter
 }
 
 func (r *users) Get(userId string) *User {
-	r.getUser <- userId
-	return <-r.user
+	user := make(chan *User)
+	r.getUser <- userGetter{
+		userId: userId,
+		user:   user,
+	}
+	defer close(user)
+	return <-user
 }
 
 func (r *users) MustGet(userId string) *User {

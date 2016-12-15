@@ -1,7 +1,5 @@
 package goio
 
-import "sync"
-
 func NewClients() *clients {
 	clts := new(clients)
 	clts.Clients = make(map[string]*Client)
@@ -9,45 +7,38 @@ func NewClients() *clients {
 
 	clts.addClt = make(chan *Client)
 	clts.delClt = make(chan *Client)
-
-	clts.clt = make(chan *Client)
-	clts.getClt = make(chan string)
-
-	clts.getCount = make(chan struct{})
-	clts.count = make(chan int)
+	clts.getClt = make(chan cltGetter)
+	clts.getCount = make(chan chan int)
 
 	go func(clts *clients) {
 		for {
 			select {
 			case msg := <-clts.Message:
 				for _, c := range clts.Clients {
-					go func(c *Client, msg *Message) {
-						c.receiveMessage <- msg
-					}(c, msg)
+					c.AddMessage(msg)
 				}
+
 			case c := <-clts.addClt:
 				clts.Clients[c.Id] = c
 
 			case c := <-clts.delClt:
-				clts.deleteClient(c.Id)
+				delete(clts.Clients, c.Id)
 
-			case clientId := <-clts.getClt:
-				client, _ := clts.Clients[clientId]
-				if client != nil && client.closed {
-					clts.deleteClient(clientId)
-					clts.clt <- nil
-				} else {
-					clts.clt <- client
-				}
-
-			case <-clts.getCount:
-				clts.count <- len(clts.Clients)
+			case getter := <-clts.getClt:
+				clt, _ := clts.Clients[getter.clientId]
+				getter.client <- clt
+			case counter := <-clts.getCount:
+				counter <- len(clts.Clients)
 			}
 		}
-
 	}(clts)
 
 	return clts
+}
+
+type cltGetter struct {
+	clientId string
+	client   chan *Client
 }
 
 type clients struct {
@@ -55,27 +46,27 @@ type clients struct {
 
 	Message chan *Message
 
-	addClt chan *Client
-	delClt chan *Client
-
-	clt    chan *Client
-	getClt chan string
-
-	count    chan int
-	getCount chan struct{}
-	lock     sync.RWMutex
+	addClt   chan *Client
+	delClt   chan *Client
+	getClt   chan cltGetter
+	getCount chan chan int
 }
 
 func (c *clients) Count() int {
-	c.getCount <- struct{}{}
-	return <-c.count
-}
+	counter := make(chan int)
+	c.getCount <- counter
 
-func (c *clients) deleteClient(cltId string) {
-	delete(c.Clients, cltId)
+	defer close(counter)
+	return <-counter
 }
 
 func (c *clients) Get(clientId string) *Client {
-	c.getClt <- clientId
-	return <-c.clt
+	clt := make(chan *Client, 1)
+	c.getClt <- cltGetter{
+		clientId: clientId,
+		client:   clt,
+	}
+
+	defer close(clt)
+	return <-clt
 }
