@@ -72,7 +72,7 @@ func main() {
 		m.GET("/test", func(ctx *gin.Context) {
 			var userId string
 			var roomId string
-			for i := 0; i < 10000; i += 1 {
+			for i := 0; i < 1000; i += 1 {
 				userId = strconv.Itoa(i % 100)
 				user := goio.Users().MustGet(userId)
 				if user == nil {

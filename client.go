@@ -34,7 +34,9 @@ func NewClient(user *User) *Client {
 
 			case <-time.After(time.Duration(LifeCycle) * time.Second):
 				DelUserClt(clt.User, clt)
+				clt.lock.Lock()
 				clt.died = true
+				clt.lock.Unlock()
 				return
 			}
 		}
@@ -53,12 +55,13 @@ type Client struct {
 }
 
 func (c *Client) AddMessage(msg *Message) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if c.died {
 		return
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.messages = append(c.messages, msg)
 }
 
