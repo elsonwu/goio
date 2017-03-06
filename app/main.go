@@ -55,6 +55,11 @@ func main() {
 	}
 
 	m.Use(func(ctx *gin.Context) {
+		defer ctx.Request.Body.Close()
+		ctx.Next()
+	})
+
+	m.Use(func(ctx *gin.Context) {
 		ctx.Header("Content-Type", "text/plain; charset=utf-8")
 		ctx.Header("Access-Control-Allow-Credentials", "true")
 		ctx.Header("Access-Control-Allow-Methods", "GET,POST")
