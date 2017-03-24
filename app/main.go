@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DeanThompson/ginpprof"
 	"github.com/elsonwu/goio"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
@@ -290,6 +291,9 @@ func main() {
 	})
 
 	m.OPTIONS("/*path", func(ctx *gin.Context) {})
+
+	// Register pprof handlers
+	ginpprof.Wrap(m)
 
 	host := *flagHost
 	if !*flagEnableHttps && *flagDisableHttp {
