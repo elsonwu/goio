@@ -17,23 +17,23 @@ func NewUsers() *users {
 				us.Users[u.Id] = u
 
 				// tell everyone this new client online
-				go func(u *User) {
+				go func(userId string) {
 					Clients().Message <- &Message{
 						EventName: "join",
-						CallerId:  u.Id,
+						CallerId:  userId,
 					}
-				}(u)
+				}(u.Id)
 
 			case u := <-us.delUser:
 				delete(us.Users, u.Id)
 
 				// tell everyone this user is offline
-				go func(u *User) {
+				go func(userId string) {
 					Clients().Message <- &Message{
 						EventName: "leave",
-						CallerId:  u.Id,
+						CallerId:  userId,
 					}
-				}(u)
+				}(u.Id)
 
 			case userGetter := <-us.getUser:
 				user, _ := us.Users[userGetter.userId]
@@ -94,7 +94,9 @@ func (us *users) Get(userId string) *User {
 func (us *users) MustGet(userId string) *User {
 	u := us.Get(userId)
 	if u == nil {
-		u = NewUser(userId)
+		u = newUser(userId)
+		u.Run()
+		Users().AddUser(u)
 	}
 
 	return u

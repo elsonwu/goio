@@ -6,7 +6,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func NewUser(userId string) *User {
+func newUser(userId string) *User {
 	user := &User{
 		Id:       userId,
 		Clients:  make(map[string]*Client),
@@ -24,8 +24,27 @@ func NewUser(userId string) *User {
 		died:     false,
 	}
 
-	Users().AddUser(user)
+	return user
+}
 
+type User struct {
+	Id       string
+	Clients  map[string]*Client
+	rooms    map[string]*Room
+	message  chan *Message
+	addClt   chan *Client
+	delClt   chan *Client
+	addRoom  chan *Room
+	delRoom  chan *Room
+	AddData  chan UserData
+	getRooms chan chan map[string]*Room
+	data     chan string
+	getData  chan string
+	dataMap  map[string]string
+	died     bool
+}
+
+func (u *User) Run() {
 	go func(user *User) {
 		for {
 			select {
@@ -83,26 +102,7 @@ func NewUser(userId string) *User {
 			}
 		}
 
-	}(user)
-
-	return user
-}
-
-type User struct {
-	Id       string
-	Clients  map[string]*Client
-	rooms    map[string]*Room
-	message  chan *Message
-	addClt   chan *Client
-	delClt   chan *Client
-	addRoom  chan *Room
-	delRoom  chan *Room
-	AddData  chan UserData
-	getRooms chan chan map[string]*Room
-	data     chan string
-	getData  chan string
-	dataMap  map[string]string
-	died     bool
+	}(u)
 }
 
 func (u *User) AddMessage(msg *Message) {
@@ -110,7 +110,10 @@ func (u *User) AddMessage(msg *Message) {
 		return
 	}
 
-	u.message <- msg
+	select {
+	case u.message <- msg:
+	case <-time.After(time.Second):
+	}
 }
 
 func (u *User) GetData(key string) string {
@@ -131,7 +134,10 @@ func (u *User) AddClt(clt *Client) {
 		return
 	}
 
-	u.addClt <- clt
+	select {
+	case u.addClt <- clt:
+	case <-time.After(time.Second):
+	}
 }
 
 func (u *User) DelClt(clt *Client) {
@@ -139,7 +145,10 @@ func (u *User) DelClt(clt *Client) {
 		return
 	}
 
-	u.delClt <- clt
+	select {
+	case u.delClt <- clt:
+	case <-time.After(time.Second):
+	}
 }
 
 func (u *User) AddRoom(room *Room) {
@@ -147,7 +156,10 @@ func (u *User) AddRoom(room *Room) {
 		return
 	}
 
-	u.addRoom <- room
+	select {
+	case u.addRoom <- room:
+	case <-time.After(time.Second):
+	}
 }
 
 func (u *User) DelRoom(room *Room) {
@@ -155,7 +167,10 @@ func (u *User) DelRoom(room *Room) {
 		return
 	}
 
-	u.delRoom <- room
+	select {
+	case u.delRoom <- room:
+	case <-time.After(time.Second):
+	}
 }
 
 func (u *User) Rooms() map[string]*Room {

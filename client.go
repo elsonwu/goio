@@ -22,8 +22,19 @@ func NewClient(user *User) *Client {
 		died:      false,
 	}
 
-	AddUserClt(user, clt)
+	return clt
+}
 
+type Client struct {
+	Id        string
+	User      *User
+	messages  []*Message
+	handshake chan bool
+	lock      sync.RWMutex
+	died      bool
+}
+
+func (c *Client) Run() {
 	// listen for client message
 	go func(clt *Client) {
 		for {
@@ -40,18 +51,14 @@ func NewClient(user *User) *Client {
 				return
 			}
 		}
-	}(clt)
-
-	return clt
+	}(c)
 }
 
-type Client struct {
-	Id        string
-	User      *User
-	messages  []*Message
-	handshake chan bool
-	lock      sync.RWMutex
-	died      bool
+func (c *Client) IsDead() bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.died
 }
 
 func (c *Client) AddMessage(msg *Message) {
@@ -68,7 +75,16 @@ func (c *Client) AddMessage(msg *Message) {
 func (c *Client) ReadMessages() []*Message {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.handshake <- true
+
+	if !c.died {
+		// might dead already
+		select {
+		case c.handshake <- true:
+		case <-time.After(time.Second):
+			return nil
+		}
+	}
+
 	msgs := c.messages
 	c.messages = make([]*Message, 0, 10)
 	return msgs

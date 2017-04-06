@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -56,11 +55,6 @@ func main() {
 	}
 
 	m.Use(func(ctx *gin.Context) {
-		defer ctx.Request.Body.Close()
-		ctx.Next()
-	})
-
-	m.Use(func(ctx *gin.Context) {
 		ctx.Header("Content-Type", "text/plain; charset=utf-8")
 		ctx.Header("Access-Control-Allow-Credentials", "true")
 		ctx.Header("Access-Control-Allow-Methods", "GET,POST")
@@ -74,27 +68,12 @@ func main() {
 		}
 	})
 
-	if *flagDebug {
-		m.GET("/test", func(ctx *gin.Context) {
-			var userId string
-			var roomId string
-			for i := 0; i < 1000; i += 1 {
-				userId = strconv.Itoa(i % 100)
-				user := goio.Users().MustGet(userId)
-				if user == nil {
-					fmt.Printf("user %#v\n", user)
-					return
-				}
-
-				client := goio.NewClient(user)
-
-				roomId = strconv.Itoa(i % 100)
-				room := goio.Rooms().MustGet(roomId)
-
-				goio.AddRoomUser(room, client.User)
-			}
-		})
-	}
+	m.Use(func(ctx *gin.Context) {
+		ctx.Next()
+		defer func() {
+			ctx.Request.Close = true
+		}()
+	})
 
 	m.GET("/count", func(ctx *gin.Context) {
 		ctx.String(200, fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count()))
@@ -178,6 +157,8 @@ func main() {
 		userId := ctx.Param("user_id")
 		user := goio.Users().MustGet(userId)
 		clt := goio.NewClient(user)
+		goio.AddUserClt(user, clt)
+		clt.Run()
 
 		ctx.String(200, clt.Id)
 	})
@@ -201,6 +182,9 @@ func main() {
 		}
 
 		for i, wait := 0, 1; i*wait <= *flagClientMessageTimeout; i++ {
+			if clt.IsDead() {
+				break
+			}
 
 			msgs := clt.ReadMessages()
 			if len(msgs) == 0 {
