@@ -85,6 +85,10 @@ func (c *Client) ReadMessages() []*Message {
 		}
 	}
 
+	if len(c.messages) == 0 {
+		return nil
+	}
+
 	msgs := c.messages
 	c.messages = make([]*Message, 0, 10)
 	return msgs
