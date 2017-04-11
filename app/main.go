@@ -181,14 +181,14 @@ func main() {
 			return
 		}
 
-		for i, wait := 0, 1; i*wait <= *flagClientMessageTimeout; i++ {
+		for i := 0; i <= *flagClientMessageTimeout; i++ {
 			if clt.IsDead() {
 				break
 			}
 
 			msgs := clt.ReadMessages()
 			if len(msgs) == 0 {
-				time.Sleep(time.Duration(wait) * time.Second)
+				<-time.After(3 * time.Second)
 				continue
 			}
 
