@@ -1,6 +1,13 @@
 package goio
 
-import "github.com/golang/glog"
+import (
+	"time"
+
+	"github.com/golang/glog"
+)
+
+// only for 10s for read/wirte chan
+const roomWait = 10
 
 func NewRoom(roomId string) *Room {
 	room := &Room{
@@ -78,7 +85,10 @@ func (r *Room) AddMessage(msg *Message) {
 		return
 	}
 
-	r.message <- msg
+	select {
+	case r.message <- msg:
+	case <-time.After(roomWait * time.Second):
+	}
 }
 
 func (r *Room) AddUser(u *User) {
@@ -86,7 +96,10 @@ func (r *Room) AddUser(u *User) {
 		return
 	}
 
-	r.addUser <- u
+	select {
+	case r.addUser <- u:
+	case <-time.After(roomWait * time.Second):
+	}
 }
 
 func (r *Room) DelUser(u *User) {
@@ -94,7 +107,10 @@ func (r *Room) DelUser(u *User) {
 		return
 	}
 
-	r.delUser <- u
+	select {
+	case r.delUser <- u:
+	case <-time.After(roomWait * time.Second):
+	}
 }
 
 func (r *Room) UserIds() []string {
