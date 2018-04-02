@@ -4,9 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/golang/glog"
-
-	"gopkg.in/mgo.v2/bson"
 )
 
 func NewClientId() string {

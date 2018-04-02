@@ -70,9 +70,8 @@ func main() {
 
 	m.Use(func(ctx *gin.Context) {
 		ctx.Next()
-		defer func() {
-			ctx.Request.Close = true
-		}()
+		ctx.Request.Close = true
+		ctx.Request.Body.Close()
 	})
 
 	m.GET("/count", func(ctx *gin.Context) {
