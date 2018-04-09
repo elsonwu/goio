@@ -1,47 +1,32 @@
 package goio
 
 import (
+	"sync"
 	"time"
-
-	"github.com/golang/glog"
 )
 
 func newUser(userId string) *User {
 	user := &User{
-		Id:       userId,
-		Clients:  make(map[string]*Client),
-		rooms:    make(map[string]*Room),
-		message:  make(chan *Message),
-		addClt:   make(chan *Client),
-		delClt:   make(chan *Client),
-		addRoom:  make(chan *Room),
-		delRoom:  make(chan *Room),
-		dataMap:  make(map[string]string),
-		data:     make(chan string),
-		getRooms: make(chan chan map[string]*Room),
-		AddData:  make(chan UserData),
-		getData:  make(chan string),
-		died:     false,
+		Id:      userId,
+		message: make(chan *Message),
+		died:    false,
 	}
 
 	return user
 }
 
 type User struct {
-	Id       string
-	Clients  map[string]*Client
-	rooms    map[string]*Room
-	message  chan *Message
-	addClt   chan *Client
-	delClt   chan *Client
-	addRoom  chan *Room
-	delRoom  chan *Room
-	AddData  chan UserData
-	getRooms chan chan map[string]*Room
-	data     chan string
-	getData  chan string
-	dataMap  map[string]string
-	died     bool
+	Id      string
+	message chan *Message
+
+	clients      sync.Map
+	clientsCount int
+
+	rooms      sync.Map
+	roomsCount int
+
+	data sync.Map
+	died bool
 }
 
 func (u *User) Run() {
@@ -53,52 +38,15 @@ func (u *User) Run() {
 					continue
 				}
 
-				glog.V(3).Infof("user %s has %d clients, received message from user %s client %s\n", user.Id, len(user.Clients), msg.CallerId, msg.ClientId)
-				for _, c := range user.Clients {
+				user.clients.Range(func(k interface{}, v interface{}) bool {
+					c := v.(*Client)
 					if c.Id == msg.ClientId {
-						glog.V(3).Infof("ignore message send from myself user[%s] client %s\n", c.User.Id, c.Id)
-						continue
+						return true
 					}
 
 					go c.AddMessage(msg)
-					glog.V(3).Infof("received message to user[%s] client %s\n", c.User.Id, c.Id)
-				}
-
-			case clt := <-user.addClt:
-				glog.V(3).Infof("user %s case addClt %s\n", user.Id, clt.Id)
-				user.Clients[clt.Id] = clt
-
-			case clt := <-user.delClt:
-				delete(user.Clients, clt.Id)
-
-				if len(user.Clients) == 0 {
-					glog.V(3).Infof("## user %s has 0 client, need to del\n", user.Id)
-					for _, r := range user.rooms {
-						r.DelUser(user)
-					}
-
-					Users().DelUser(user)
-					user.died = true
-					return
-				}
-			case room := <-user.addRoom:
-				glog.V(3).Infof("user case addRoom")
-				user.rooms[room.Id] = room
-
-			case room := <-user.delRoom:
-				glog.V(3).Infof("user case delRoom")
-				delete(user.rooms, room.Id)
-
-			case key := <-user.getData:
-				glog.V(3).Infof("user case getData")
-				user.data <- user.dataMap[key]
-
-			case userData := <-user.AddData:
-				glog.V(3).Info("user case AddData")
-				user.dataMap[userData.Key] = userData.Val
-
-			case rooms := <-user.getRooms:
-				rooms <- user.rooms
+					return true
+				})
 			}
 		}
 
@@ -116,17 +64,21 @@ func (u *User) AddMessage(msg *Message) {
 	}
 }
 
+func (u *User) AddData(k string, v string) {
+	u.data.Store(k, v)
+}
+
 func (u *User) GetData(key string) string {
 	if u.died {
 		return ""
 	}
 
-	select {
-	case u.getData <- key:
-		return <-u.data
-	case <-time.After(time.Second):
+	v, ok := u.data.Load(key)
+	if !ok {
 		return ""
 	}
+
+	return v.(string)
 }
 
 func (u *User) AddClt(clt *Client) {
@@ -134,10 +86,8 @@ func (u *User) AddClt(clt *Client) {
 		return
 	}
 
-	select {
-	case u.addClt <- clt:
-	case <-time.After(time.Second):
-	}
+	u.clientsCount = u.clientsCount + 1
+	u.clients.Store(clt.Id, clt)
 }
 
 func (u *User) DelClt(clt *Client) {
@@ -145,9 +95,16 @@ func (u *User) DelClt(clt *Client) {
 		return
 	}
 
-	select {
-	case u.delClt <- clt:
-	case <-time.After(time.Second):
+	u.clientsCount = u.clientsCount - 1
+	u.clients.Delete(clt.Id)
+
+	if u.clientsCount <= 0 {
+		u.died = true
+		Users().DelUser(u)
+		u.rooms.Range(func(k interface{}, v interface{}) bool {
+			v.(*Room).DelUser(u)
+			return true
+		})
 	}
 }
 
@@ -156,10 +113,8 @@ func (u *User) AddRoom(room *Room) {
 		return
 	}
 
-	select {
-	case u.addRoom <- room:
-	case <-time.After(time.Second):
-	}
+	u.roomsCount = u.roomsCount + 1
+	u.rooms.Store(room.Id, room)
 }
 
 func (u *User) DelRoom(room *Room) {
@@ -167,10 +122,8 @@ func (u *User) DelRoom(room *Room) {
 		return
 	}
 
-	select {
-	case u.delRoom <- room:
-	case <-time.After(time.Second):
-	}
+	u.roomsCount = u.roomsCount + 1
+	u.rooms.Delete(room.Id)
 }
 
 func (u *User) Rooms() map[string]*Room {
@@ -178,8 +131,12 @@ func (u *User) Rooms() map[string]*Room {
 		return make(map[string]*Room)
 	}
 
-	rooms := make(chan map[string]*Room)
-	u.getRooms <- rooms
-	defer close(rooms)
-	return <-rooms
+	var rooms map[string]*Room
+	u.rooms.Range(func(k interface{}, v interface{}) bool {
+		room := v.(*Room)
+		rooms[room.Id] = room
+		return true
+	})
+
+	return rooms
 }

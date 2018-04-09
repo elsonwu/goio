@@ -43,6 +43,7 @@ func (r *rooms) MustGet(roomId string) *Room {
 	room := r.Get(roomId)
 	if room == nil {
 		room = NewRoom(roomId)
+		r.AddRoom(room)
 	}
 
 	return room

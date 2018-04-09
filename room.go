@@ -8,14 +8,11 @@ import (
 const roomWait = 10
 
 func NewRoom(roomId string) *Room {
-	room := &Room{
+	return &Room{
 		Id:      roomId,
 		message: make(chan *Message),
 		died:    false,
 	}
-
-	Rooms().AddRoom(room)
-	return room
 }
 
 type Room struct {
@@ -63,7 +60,7 @@ func (r *Room) DelUser(u *User) {
 	r.userCount = r.userCount - 1
 	r.m.Delete(u.Id)
 
-	if r.userCount == 0 {
+	if r.userCount <= 0 {
 		r.died = true
 		Rooms().DelRoom(r)
 	}
