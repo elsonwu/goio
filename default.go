@@ -13,6 +13,12 @@ var usLock sync.Mutex
 var rsLock sync.Mutex
 var csLock sync.Mutex
 
+func init() {
+	Users()
+	Rooms()
+	Clients()
+}
+
 func Users() *users {
 	if _us == nil {
 		usLock.Lock()

@@ -1,64 +1,31 @@
 package goio
 
+import "sync"
+
 func NewClients() *clients {
 	clts := new(clients)
-	clts.Clients = make(map[string]*Client)
-	clts.Message = make(chan *Message)
-
-	clts.addClt = make(chan *Client)
-	clts.delClt = make(chan *Client)
-	clts.getClt = make(chan cltGetter)
-	clts.getCount = make(chan chan int)
-
-	go func(clts *clients) {
-		for {
-			select {
-			case msg := <-clts.Message:
-				for _, c := range clts.Clients {
-					go c.AddMessage(msg)
-				}
-
-			case c := <-clts.addClt:
-				clts.Clients[c.Id] = c
-
-			case c := <-clts.delClt:
-				delete(clts.Clients, c.Id)
-
-			case getter := <-clts.getClt:
-				clt, _ := clts.Clients[getter.clientId]
-				getter.client <- clt
-
-			case counter := <-clts.getCount:
-				counter <- len(clts.Clients)
-			}
-		}
-	}(clts)
-
 	return clts
 }
 
-type cltGetter struct {
-	clientId string
-	client   chan *Client
-}
-
 type clients struct {
-	Clients map[string]*Client
-
-	Message chan *Message
-
-	addClt   chan *Client
-	delClt   chan *Client
-	getClt   chan cltGetter
-	getCount chan chan int
+	m     sync.Map
+	count int
 }
 
 func (c *clients) Count() int {
-	counter := make(chan int)
-	c.getCount <- counter
+	return c.count
+}
 
-	defer close(counter)
-	return <-counter
+func (c *clients) AddMessage(msg *Message) {
+	c.m.Range(func(k interface{}, v interface{}) bool {
+		clt := v.(*Client)
+		if clt.died {
+			return true
+		}
+
+		go clt.AddMessage(msg)
+		return true
+	})
 }
 
 func (c *clients) AddClt(clt *Client) {
@@ -66,20 +33,20 @@ func (c *clients) AddClt(clt *Client) {
 		return
 	}
 
-	c.addClt <- clt
+	c.count = c.count + 1
+	c.m.Store(clt.Id, clt)
 }
 
 func (c *clients) DelClt(clt *Client) {
-	c.delClt <- clt
+	c.count = c.count - 1
+	c.m.Delete(clt.Id)
 }
 
 func (c *clients) Get(clientId string) *Client {
-	clt := make(chan *Client, 1)
-	c.getClt <- cltGetter{
-		clientId: clientId,
-		client:   clt,
+	v, ok := c.m.Load(clientId)
+	if !ok {
+		return nil
 	}
 
-	defer close(clt)
-	return <-clt
+	return v.(*Client)
 }

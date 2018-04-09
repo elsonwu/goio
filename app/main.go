@@ -33,10 +33,6 @@ func main() {
 
 	flag.Parse()
 
-	goio.Rooms()
-	goio.Users()
-	goio.Clients()
-
 	if *flagDebug {
 		go func() {
 			for {

@@ -43,10 +43,8 @@ func (c *Client) Run() {
 				// skip this waiting
 
 			case <-time.After(time.Duration(LifeCycle) * time.Second):
-				DelUserClt(clt.User, clt)
-				clt.lock.Lock()
 				clt.died = true
-				clt.lock.Unlock()
+				DelUserClt(clt.User, clt)
 				return
 			}
 		}
@@ -54,9 +52,6 @@ func (c *Client) Run() {
 }
 
 func (c *Client) IsDead() bool {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	return c.died
 }
 

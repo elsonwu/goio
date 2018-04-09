@@ -1,65 +1,15 @@
 package goio
 
+import "sync"
+
 func NewUsers() *users {
 	us := new(users)
-	us.Users = make(map[string]*User)
-	us.addUser = make(chan *User)
-	us.delUser = make(chan *User)
-
-	us.getUser = make(chan userGetter)
-
-	us.getCount = make(chan chan int)
-
-	go func(us *users) {
-		for {
-			select {
-			case u := <-us.addUser:
-				us.Users[u.Id] = u
-
-				// tell everyone this new client online
-				go func(userId string) {
-					Clients().Message <- &Message{
-						EventName: "join",
-						CallerId:  userId,
-					}
-				}(u.Id)
-
-			case u := <-us.delUser:
-				delete(us.Users, u.Id)
-
-				// tell everyone this user is offline
-				go func(userId string) {
-					Clients().Message <- &Message{
-						EventName: "leave",
-						CallerId:  userId,
-					}
-				}(u.Id)
-
-			case userGetter := <-us.getUser:
-				user, _ := us.Users[userGetter.userId]
-				userGetter.user <- user
-
-			case counter := <-us.getCount:
-				counter <- len(us.Users)
-			}
-		}
-
-	}(us)
-
 	return us
 }
 
-type userGetter struct {
-	userId string
-	user   chan *User
-}
-
 type users struct {
-	Users    map[string]*User
-	addUser  chan *User
-	delUser  chan *User
-	getUser  chan userGetter
-	getCount chan chan int
+	m     sync.Map
+	count int
 }
 
 func (us *users) AddUser(u *User) {
@@ -67,28 +17,42 @@ func (us *users) AddUser(u *User) {
 		return
 	}
 
-	us.addUser <- u
+	us.count = us.count + 1
+	us.m.Store(u.Id, u)
+
+	// tell everyone this new client online
+	go func(userId string) {
+		Clients().AddMessage(&Message{
+			EventName: "join",
+			CallerId:  userId,
+		})
+	}(u.Id)
 }
 
 func (us *users) DelUser(u *User) {
-	us.delUser <- u
+	us.count = us.count - 1
+	us.m.Delete(u.Id)
+
+	// tell everyone this user is offline
+	go func(userId string) {
+		Clients().AddMessage(&Message{
+			EventName: "leave",
+			CallerId:  userId,
+		})
+	}(u.Id)
 }
 
 func (us *users) Count() int {
-	counter := make(chan int)
-	us.getCount <- counter
-	defer close(counter)
-	return <-counter
+	return us.count
 }
 
 func (us *users) Get(userId string) *User {
-	user := make(chan *User)
-	us.getUser <- userGetter{
-		userId: userId,
-		user:   user,
+	v, ok := us.m.Load(userId)
+	if !ok {
+		return nil
 	}
-	defer close(user)
-	return <-user
+
+	return v.(*User)
 }
 
 func (us *users) MustGet(userId string) *User {
