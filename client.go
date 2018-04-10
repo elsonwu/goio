@@ -1,83 +1,67 @@
 package goio
 
 import (
-	"sync"
+	"log"
 	"time"
 
 	"github.com/globalsign/mgo/bson"
-	"github.com/golang/glog"
 )
 
-func NewClientId() string {
+func newClientId() string {
 	return bson.NewObjectId().Hex()
 }
 
 func NewClient(user *User) *Client {
 	clt := &Client{
-		Id:        NewClientId(),
-		User:      user,
-		messages:  make([]*Message, 0, 10),
-		handshake: make(chan bool),
-		died:      false,
+		Id:   newClientId(),
+		User: user,
+		died: false,
 	}
+
+	clt.Ping()
+
+	Clients().AddClt(clt)
+	user.AddClt(clt)
 
 	return clt
 }
 
 type Client struct {
-	Id        string
-	User      *User
-	messages  []*Message
-	handshake chan bool
-	lock      sync.RWMutex
-	died      bool
+	Id            string
+	User          *User
+	messages      []*Message
+	lastHandshake int64
+	died          bool
 }
 
-func (c *Client) Run() {
-	// listen for client message
-	go func(clt *Client) {
-		for {
-			select {
-			case <-clt.handshake:
-				glog.V(2).Infof("client " + clt.Id + " handshake")
-				// skip this waiting
+func (c *Client) Ping() {
+	c.died = false
+	c.lastHandshake = time.Now().Unix()
+}
 
-			case <-time.After(time.Duration(LifeCycle) * time.Second):
-				clt.died = true
-				DelUserClt(clt.User, clt)
-				return
-			}
-		}
-	}(c)
+func (c *Client) SetIsDead() {
+	c.died = true
 }
 
 func (c *Client) IsDead() bool {
-	return c.died
+	return c.died || c.lastHandshake+LifeCycle < time.Now().Unix()
 }
 
-func (c *Client) AddMessage(msg *Message) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.died {
+func (c *Client) addMessage(msg *Message) {
+	if c.IsDead() {
 		return
 	}
 
+	log.Println("client.addMessage " + c.Id + " message " + msg.EventName)
 	c.messages = append(c.messages, msg)
 }
 
 func (c *Client) ReadMessages() []*Message {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if !c.died {
-		// might dead already
-		select {
-		case c.handshake <- true:
-		case <-time.After(time.Second):
-			return nil
-		}
+	if c.IsDead() {
+		return nil
 	}
+
+	c.Ping()
 
 	if len(c.messages) == 0 {
 		return nil

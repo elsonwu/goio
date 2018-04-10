@@ -8,72 +8,59 @@ import (
 const roomWait = 10
 
 func NewRoom(roomId string) *Room {
-	return &Room{
-		Id:      roomId,
-		message: make(chan *Message),
-		died:    false,
+	r := &Room{
+		Id: roomId,
 	}
+
+	Rooms().AddRoom(r)
+
+	return r
 }
 
 type Room struct {
 	Id        string
 	m         sync.Map
-	message   chan *Message
-	died      bool
 	userCount int
 }
 
-func (r *Room) AddMessage(msg *Message) {
-	if r.died {
+func (r *Room) IsDead() bool {
+	return r.userCount <= 0
+}
+
+func (r *Room) addMessage(msg *Message) {
+	if r.IsDead() {
 		return
 	}
 
-	var u *User
 	r.m.Range(func(k interface{}, v interface{}) bool {
-		u = v.(*User)
-		if u == nil {
+		u := v.(*User)
+		if u == nil || u.IsDead() {
 			return true
 		}
 
-		if !u.died {
-			u.AddMessage(msg)
-		}
-
+		u.addMessage(msg)
 		return true
 	})
 }
 
-func (r *Room) AddUser(u *User) {
-	if r.died {
-		return
-	}
-
-	r.userCount = r.userCount + 1
+func (r *Room) addUser(u *User) {
+	r.userCount += 1
 	r.m.Store(u.Id, u)
 }
 
-func (r *Room) DelUser(u *User) {
-	if r.died {
-		return
-	}
-
-	r.userCount = r.userCount - 1
+func (r *Room) delUser(u *User) {
+	r.userCount -= 1
 	r.m.Delete(u.Id)
-
-	if r.userCount <= 0 {
-		r.died = true
-		Rooms().DelRoom(r)
-	}
 }
 
 func (r *Room) UserIds() []string {
-	if r.died {
+	if r.IsDead() {
 		return nil
 	}
 
 	var userIds []string
 	r.m.Range(func(k interface{}, v interface{}) bool {
-		userIds = append(userIds, v.(string))
+		userIds = append(userIds, v.(*User).Id)
 		return true
 	})
 

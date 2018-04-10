@@ -1,6 +1,9 @@
 package goio
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 func NewClients() *clients {
 	clts := new(clients)
@@ -16,29 +19,26 @@ func (c *clients) Count() int {
 	return c.count
 }
 
-func (c *clients) AddMessage(msg *Message) {
+func (c *clients) addMessage(msg *Message) {
+	log.Println("client(s) message " + msg.EventName + " clientId " + msg.ClientId + " callerId " + msg.CallerId)
 	c.m.Range(func(k interface{}, v interface{}) bool {
 		clt := v.(*Client)
-		if clt.died {
+		if clt == nil || clt.IsDead() || clt.Id == msg.ClientId {
 			return true
 		}
 
-		go clt.AddMessage(msg)
+		clt.addMessage(msg)
 		return true
 	})
 }
 
 func (c *clients) AddClt(clt *Client) {
-	if clt.died {
-		return
-	}
-
-	c.count = c.count + 1
+	c.count += 1
 	c.m.Store(clt.Id, clt)
 }
 
 func (c *clients) DelClt(clt *Client) {
-	c.count = c.count - 1
+	c.count -= 1
 	c.m.Delete(clt.Id)
 }
 
@@ -49,4 +49,16 @@ func (c *clients) Get(clientId string) *Client {
 	}
 
 	return v.(*Client)
+}
+
+func (c *clients) Range(f func(r *Client)) {
+	c.m.Range(func(k interface{}, v interface{}) bool {
+		client, ok := v.(*Client)
+		if !ok {
+			return true
+		}
+
+		f(client)
+		return true
+	})
 }

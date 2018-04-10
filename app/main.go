@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"runtime"
 	"strings"
 	"time"
 
@@ -21,7 +20,8 @@ var flagHost = flag.String("host", "127.0.0.1:9999", "the default server host")
 var flagSSLHost = flag.String("sslhost", "", "the server host for https, it will override the host setting")
 var flagAllowOrigin = flag.String("alloworigin", "*", "the host allow to cross site ajax")
 var flagDebug = flag.Bool("debug", false, "enable debug mode or not")
-var flagClientLifeCycle = flag.Int64("lifecycle", 30, "how many seconds of the client life cycle")
+var flagGCPeriod = flag.Int("gcperiod", 5, "how many seconds to run gc")
+var flagClientLifeCycle = flag.Int64("lifecycle", 15, "how many seconds of the client life cycle")
 var flagClientMessageTimeout = flag.Int("messagetimeout", 15, "how many seconds of the client keep waiting for new messages")
 var flagEnableHttps = flag.Bool("enablehttps", false, "enable https or not")
 var flagDisableHttp = flag.Bool("disablehttp", false, "disable http and use https only")
@@ -29,20 +29,12 @@ var flagCertFile = flag.String("certfile", "", "certificate file path")
 var flagKeyFile = flag.String("keyfile", "", "private file path")
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.Parse()
 
-	if *flagDebug {
-		go func() {
-			for {
-				time.Sleep(3 * time.Second)
-				log.Printf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count())
-			}
-		}()
-	}
-
+	goio.GCPeriod = *flagGCPeriod
 	goio.LifeCycle = *flagClientLifeCycle
+	goio.Run()
 
 	m := gin.New()
 	m.Use(gin.Recovery())
@@ -71,7 +63,30 @@ func main() {
 	})
 
 	m.GET("/count", func(ctx *gin.Context) {
-		ctx.String(200, fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count()))
+
+		s := fmt.Sprintf("rooms: %d, users: %d, clients: %d \n", goio.Rooms().Count(), goio.Users().Count(), goio.Clients().Count())
+		if yes, _ := ctx.GetQuery("debug"); yes == "1" {
+			s = s + "#Rooms\n"
+			goio.Rooms().Range(func(r *goio.Room) {
+				s = s + " - " + r.Id + "\n"
+			})
+
+			s = s + "\n"
+
+			s = s + "#Users\n"
+			goio.Users().Range(func(u *goio.User) {
+				s = s + " - " + u.Id + "\n"
+			})
+
+			s = s + "\n"
+
+			s = s + "#Clients\n"
+			goio.Clients().Range(func(c *goio.Client) {
+				s = s + " - " + c.Id + "\n"
+			})
+		}
+
+		ctx.String(200, s)
 	})
 
 	// get user ids array from the given room
@@ -149,16 +164,13 @@ func main() {
 		userId := ctx.Param("user_id")
 		user := goio.Users().MustGet(userId)
 		clt := goio.NewClient(user)
-		goio.AddUserClt(user, clt)
-		clt.Run()
-
 		ctx.String(200, clt.Id)
 	})
 
 	m.GET("/kill_client/:client_id", func(ctx *gin.Context) {
 		clt := goio.Clients().Get(ctx.Param("client_id"))
 		if clt != nil {
-			goio.DelUserClt(clt.User, clt)
+			clt.SetIsDead()
 		}
 
 		ctx.String(204, "")
@@ -168,19 +180,15 @@ func main() {
 		id := ctx.Param("client_id")
 		clt := goio.Clients().Get(id)
 
-		if clt == nil {
+		if clt == nil || clt.IsDead() {
 			ctx.String(404, fmt.Sprintf("Client %s does not exist\n", id))
 			return
 		}
 
 		for i := 0; i <= *flagClientMessageTimeout; i++ {
-			if clt.IsDead() {
-				break
-			}
-
 			msgs := clt.ReadMessages()
 			if len(msgs) == 0 {
-				<-time.After(3 * time.Second)
+				<-time.After(time.Second)
 				continue
 			}
 
@@ -200,7 +208,7 @@ func main() {
 	m.POST("/message/:client_id", func(ctx *gin.Context) {
 		id := ctx.Param("client_id")
 		clt := goio.Clients().Get(id)
-		if clt == nil {
+		if clt == nil || clt.IsDead() {
 			ctx.String(403, fmt.Sprintf("Client %s does not exist\n", id))
 			return
 		}
@@ -216,52 +224,7 @@ func main() {
 		msg.CallerId = clt.User.Id
 		msg.ClientId = clt.Id
 
-		go func(msg *goio.Message, clt *goio.Client) {
-			if *flagDebug {
-				log.Printf("post msg: %#v\n", *msg)
-			}
-
-			glog.V(1).Infoln("user send msg - begin")
-
-			switch msg.EventName {
-			case "join":
-				glog.V(1).Infof("msg event - join\n")
-				if msg.RoomId != "" {
-					r := goio.Rooms().MustGet(msg.RoomId)
-					goio.AddRoomUser(r, clt.User)
-					r.AddMessage(msg)
-				}
-
-			case "leave":
-				glog.V(1).Infof("msg event - leave\n")
-				if msg.RoomId != "" {
-					r := goio.Rooms().Get(msg.RoomId)
-					if r != nil {
-						goio.DelRoomUser(r, clt.User)
-						r.AddMessage(msg)
-					}
-				}
-			case "broadcast":
-				glog.V(1).Infoln("msg event - broadcast\n")
-
-				if msg.RoomId != "" {
-					r := goio.Rooms().Get(msg.RoomId)
-					if r != nil {
-						r.AddMessage(msg)
-					}
-				} else {
-					for _, r := range clt.User.Rooms() {
-						r.AddMessage(msg)
-					}
-				}
-
-			default:
-				glog.V(1).Infoln("unknown user msg")
-			}
-
-			glog.V(1).Infoln("user send msg - done")
-
-		}(msg, clt)
+		goio.SendMessage(msg, clt)
 
 		ctx.String(204, "")
 	})
@@ -273,7 +236,8 @@ func main() {
 
 	host := *flagHost
 	if !*flagEnableHttps && *flagDisableHttp {
-		log.Fatalln("You cannot disable http but not enable https in the same time")
+		glog.Errorln("You cannot disable http but not enable https in the same time")
+		return
 	}
 
 	//Prevent exiting

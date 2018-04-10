@@ -1,6 +1,10 @@
 package goio
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/golang/glog"
+)
 
 func NewUsers() *users {
 	us := new(users)
@@ -12,34 +16,27 @@ type users struct {
 	count int
 }
 
-func (us *users) AddUser(u *User) {
-	if u.died {
-		return
-	}
+func (us *users) addMessage(msg *Message) {
+	glog.V(1).Infoln("user(s) message " + msg.EventName)
+	us.m.Range(func(k interface{}, v interface{}) bool {
+		u := v.(*User)
+		if u == nil || u.IsDead() || u.Id == msg.CallerId {
+			return true
+		}
 
-	us.count = us.count + 1
-	us.m.Store(u.Id, u)
-
-	// tell everyone this new client online
-	go func(userId string) {
-		Clients().AddMessage(&Message{
-			EventName: "join",
-			CallerId:  userId,
-		})
-	}(u.Id)
+		u.addMessage(msg)
+		return true
+	})
 }
 
-func (us *users) DelUser(u *User) {
-	us.count = us.count - 1
-	us.m.Delete(u.Id)
+func (us *users) addUser(u *User) {
+	us.count += 1
+	us.m.Store(u.Id, u)
+}
 
-	// tell everyone this user is offline
-	go func(userId string) {
-		Clients().AddMessage(&Message{
-			EventName: "leave",
-			CallerId:  userId,
-		})
-	}(u.Id)
+func (us *users) delUser(u *User) {
+	us.count -= 1
+	us.m.Delete(u.Id)
 }
 
 func (us *users) Count() int {
@@ -59,9 +56,19 @@ func (us *users) MustGet(userId string) *User {
 	u := us.Get(userId)
 	if u == nil {
 		u = newUser(userId)
-		u.Run()
-		Users().AddUser(u)
 	}
 
 	return u
+}
+
+func (us *users) Range(f func(r *User)) {
+	us.m.Range(func(k interface{}, v interface{}) bool {
+		user, ok := v.(*User)
+		if !ok {
+			return true
+		}
+
+		f(user)
+		return true
+	})
 }

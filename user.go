@@ -2,22 +2,27 @@ package goio
 
 import (
 	"sync"
-	"time"
+
+	"github.com/golang/glog"
 )
 
 func newUser(userId string) *User {
 	user := &User{
-		Id:      userId,
-		message: make(chan *Message),
-		died:    false,
+		Id: userId,
 	}
+
+	Users().addUser(user)
+
+	SendMessage(&Message{
+		EventName: MsgJoin,
+		CallerId:  user.Id,
+	}, user)
 
 	return user
 }
 
 type User struct {
-	Id      string
-	message chan *Message
+	Id string
 
 	clients      sync.Map
 	clientsCount int
@@ -26,42 +31,31 @@ type User struct {
 	roomsCount int
 
 	data sync.Map
-	died bool
 }
 
-func (u *User) Run() {
-	go func(user *User) {
-		for {
-			select {
-			case msg := <-user.message:
-				if user.died {
-					continue
-				}
-
-				user.clients.Range(func(k interface{}, v interface{}) bool {
-					c := v.(*Client)
-					if c.Id == msg.ClientId {
-						return true
-					}
-
-					go c.AddMessage(msg)
-					return true
-				})
-			}
-		}
-
-	}(u)
+func (u *User) IsDead() bool {
+	return u.clientsCount <= 0
 }
 
-func (u *User) AddMessage(msg *Message) {
-	if u.died {
+func (u *User) addMessage(msg *Message) {
+	if u.IsDead() {
 		return
 	}
 
-	select {
-	case u.message <- msg:
-	case <-time.After(time.Second):
-	}
+	glog.V(1).Infoln("user.addMessage " + u.Id + " message " + msg.EventName)
+	u.clients.Range(func(k interface{}, v interface{}) bool {
+		c := v.(*Client)
+		if c == nil || c.IsDead() {
+			return true
+		}
+
+		if c.Id == msg.ClientId {
+			return true
+		}
+
+		c.addMessage(msg)
+		return true
+	})
 }
 
 func (u *User) AddData(k string, v string) {
@@ -69,7 +63,7 @@ func (u *User) AddData(k string, v string) {
 }
 
 func (u *User) GetData(key string) string {
-	if u.died {
+	if u.IsDead() {
 		return ""
 	}
 
@@ -82,56 +76,35 @@ func (u *User) GetData(key string) string {
 }
 
 func (u *User) AddClt(clt *Client) {
-	if u.died || clt.died {
-		return
-	}
-
-	u.clientsCount = u.clientsCount + 1
+	u.clientsCount += 1
 	u.clients.Store(clt.Id, clt)
 }
 
 func (u *User) DelClt(clt *Client) {
-	if u.died {
-		return
-	}
-
-	u.clientsCount = u.clientsCount - 1
+	u.clientsCount -= 1
 	u.clients.Delete(clt.Id)
-
-	if u.clientsCount <= 0 {
-		u.died = true
-		Users().DelUser(u)
-		u.rooms.Range(func(k interface{}, v interface{}) bool {
-			v.(*Room).DelUser(u)
-			return true
-		})
-	}
 }
 
 func (u *User) AddRoom(room *Room) {
-	if u.died || room.died {
+	if u.IsDead() {
 		return
 	}
 
-	u.roomsCount = u.roomsCount + 1
+	u.roomsCount += 1
 	u.rooms.Store(room.Id, room)
 }
 
 func (u *User) DelRoom(room *Room) {
-	if u.died {
-		return
-	}
-
-	u.roomsCount = u.roomsCount + 1
+	u.roomsCount -= 1
 	u.rooms.Delete(room.Id)
 }
 
 func (u *User) Rooms() map[string]*Room {
-	if u.died {
-		return make(map[string]*Room)
+	if u.roomsCount <= 0 {
+		return nil
 	}
 
-	var rooms map[string]*Room
+	rooms := make(map[string]*Room)
 	u.rooms.Range(func(k interface{}, v interface{}) bool {
 		room := v.(*Room)
 		rooms[room.Id] = room

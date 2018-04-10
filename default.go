@@ -1,9 +1,14 @@
 package goio
 
-import "sync"
+import (
+	"sync"
+)
 
 // for client life cycle, default 30s
 var LifeCycle int64 = 30
+
+// how many seconds to run gc
+var GCPeriod int = 5
 
 var _us *users
 var _rs *rooms
@@ -12,12 +17,6 @@ var _cs *clients
 var usLock sync.Mutex
 var rsLock sync.Mutex
 var csLock sync.Mutex
-
-func init() {
-	Users()
-	Rooms()
-	Clients()
-}
 
 func Users() *users {
 	if _us == nil {
