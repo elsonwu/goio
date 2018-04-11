@@ -1,10 +1,10 @@
 package goio
 
 import (
-	"log"
 	"time"
 
 	"github.com/globalsign/mgo/bson"
+	"github.com/golang/glog"
 )
 
 func newClientId() string {
@@ -52,7 +52,7 @@ func (c *Client) addMessage(msg *Message) {
 		return
 	}
 
-	log.Println("client.addMessage " + c.Id + " message " + msg.EventName)
+	glog.V(1).Infoln("client.addMessage " + c.Id + " message " + msg.EventName)
 	c.messages = append(c.messages, msg)
 }
 

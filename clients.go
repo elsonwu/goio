@@ -1,8 +1,9 @@
 package goio
 
 import (
-	"log"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 func NewClients() *clients {
@@ -20,7 +21,7 @@ func (c *clients) Count() int {
 }
 
 func (c *clients) addMessage(msg *Message) {
-	log.Println("client(s) message " + msg.EventName + " clientId " + msg.ClientId + " callerId " + msg.CallerId)
+	glog.V(1).Infoln("client(s) message " + msg.EventName + " clientId " + msg.ClientId + " callerId " + msg.CallerId)
 	c.m.Range(func(k interface{}, v interface{}) bool {
 		clt := v.(*Client)
 		if clt == nil || clt.IsDead() || clt.Id == msg.ClientId {
