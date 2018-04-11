@@ -1,7 +1,7 @@
 package goio
 
 import (
-	"fmt"
+	"github.com/golang/glog"
 )
 
 func gc() {
@@ -12,7 +12,7 @@ func gc() {
 			return true
 		}
 
-		fmt.Println("clt " + clt.Id + " is dead")
+		glog.V(1).Infoln("clt " + clt.Id + " is dead")
 		Clients().DelClt(clt)
 		clt.User.DelClt(clt)
 
@@ -29,7 +29,7 @@ func gc() {
 
 		deadUsrs = append(deadUsrs, u)
 
-		fmt.Println("user " + u.Id + " is dead")
+		glog.V(1).Infoln("user " + u.Id + " is dead")
 		Users().delUser(u)
 		for _, r := range u.Rooms() {
 			r.delUser(u)
@@ -45,7 +45,7 @@ func gc() {
 			return true
 		}
 
-		fmt.Println("room " + u.Id + " is dead")
+		glog.V(1).Infoln("room " + u.Id + " is dead")
 		Rooms().DelRoom(r)
 		return true
 	})

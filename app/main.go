@@ -38,8 +38,11 @@ func main() {
 
 	m := gin.New()
 	m.Use(gin.Recovery())
+	fmt.Println(*flagDebug)
 	if *flagDebug {
 		m.Use(gin.Logger())
+	} else {
+		gin.SetMode(gin.ReleaseMode)
 	}
 
 	m.Use(func(ctx *gin.Context) {
