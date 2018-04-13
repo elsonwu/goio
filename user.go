@@ -34,7 +34,11 @@ type User struct {
 }
 
 func (u *User) IsDead() bool {
-	return u.clientsCount <= 0
+	if u.clientsCount >= 2 {
+		return false
+	}
+
+	return !u.anyActiveClient()
 }
 
 func (u *User) addMessage(msg *Message) {
@@ -73,6 +77,29 @@ func (u *User) GetData(key string) string {
 	}
 
 	return v.(string)
+}
+
+func (u *User) ClientCount() int {
+	return u.clientsCount
+}
+
+func (u *User) anyActiveClient() bool {
+	has := false
+	u.clients.Range(func(k interface{}, v interface{}) bool {
+		c, ok := v.(*Client)
+		if c == nil || !ok {
+			return true
+		}
+
+		if c.IsDead() {
+			has = true
+			return false
+		}
+
+		return true
+	})
+
+	return has
 }
 
 func (u *User) AddClt(clt *Client) {

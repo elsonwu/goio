@@ -4,7 +4,19 @@ import (
 	"github.com/golang/glog"
 )
 
+var gcIsRunning = false
+
 func gc() {
+
+	if gcIsRunning {
+		return
+	}
+
+	gcIsRunning = true
+	defer func() {
+		gcIsRunning = false
+	}()
+
 	var clt *Client
 	Clients().m.Range(func(k interface{}, v interface{}) bool {
 		clt = v.(*Client)

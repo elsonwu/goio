@@ -24,7 +24,34 @@ type Room struct {
 }
 
 func (r *Room) IsDead() bool {
-	return r.userCount <= 0
+	if r.userCount >= 2 {
+		return false
+	}
+
+	return !r.anyActiveUser()
+}
+
+func (r *Room) anyActiveUser() bool {
+	has := false
+	r.m.Range(func(k interface{}, v interface{}) bool {
+		u, ok := v.(*User)
+		if u == nil || !ok {
+			return true
+		}
+
+		if u.anyActiveClient() {
+			has = true
+			return false
+		}
+
+		return true
+	})
+
+	return has
+}
+
+func (r *Room) UserCount() int {
+	return r.userCount
 }
 
 func (r *Room) addMessage(msg *Message) {

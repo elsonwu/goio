@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,7 +39,6 @@ func main() {
 
 	m := gin.New()
 	m.Use(gin.Recovery())
-	fmt.Println(*flagDebug)
 	if *flagDebug {
 		m.Use(gin.Logger())
 	} else {
@@ -71,21 +71,21 @@ func main() {
 		if yes, _ := ctx.GetQuery("debug"); yes == "1" {
 			s = s + "#Rooms\n"
 			goio.Rooms().Range(func(r *goio.Room) {
-				s = s + " - " + r.Id + "\n"
+				s = s + " - " + r.Id + " user count:" + strconv.Itoa(r.UserCount()) + "\n"
 			})
 
 			s = s + "\n"
 
 			s = s + "#Users\n"
 			goio.Users().Range(func(u *goio.User) {
-				s = s + " - " + u.Id + "\n"
+				s = s + " - " + u.Id + " client count:" + strconv.Itoa(u.ClientCount()) + "\n"
 			})
 
 			s = s + "\n"
 
 			s = s + "#Clients\n"
 			goio.Clients().Range(func(c *goio.Client) {
-				s = s + " - " + c.Id + "\n"
+				s = s + " - " + c.Id + " user ID:" + c.User.Id + " user client count:" + strconv.Itoa(c.User.ClientCount()) + "\n"
 			})
 		}
 
