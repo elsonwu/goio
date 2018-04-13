@@ -39,7 +39,7 @@ func (r *Room) anyActiveUser() bool {
 			return true
 		}
 
-		if u.anyActiveClient() {
+		if !u.IsDead() {
 			has = true
 			return false
 		}

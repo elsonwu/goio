@@ -91,7 +91,7 @@ func (u *User) anyActiveClient() bool {
 			return true
 		}
 
-		if c.IsDead() {
+		if !c.IsDead() {
 			has = true
 			return false
 		}
