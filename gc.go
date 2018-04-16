@@ -1,6 +1,9 @@
 package goio
 
 import (
+	"log"
+	"time"
+
 	"github.com/golang/glog"
 )
 
@@ -12,8 +15,10 @@ func gc() {
 		return
 	}
 
+	startTime := time.Now()
 	gcIsRunning = true
 	defer func() {
+		log.Println("GC process " + time.Now().Sub(startTime).String())
 		gcIsRunning = false
 	}()
 

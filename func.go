@@ -68,7 +68,7 @@ func SendMessage(msg *Message, caller interface{}) {
 			}
 		} else if msg.CallerId != "" {
 			// tell everyone this client offline
-			go Users().addMessage(msg)
+			go Clients().addMessage(msg)
 		}
 
 	case MsgBroadcast:

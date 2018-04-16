@@ -2,8 +2,6 @@ package goio
 
 import (
 	"sync"
-
-	"github.com/golang/glog"
 )
 
 func NewUsers() *users {
@@ -14,19 +12,6 @@ func NewUsers() *users {
 type users struct {
 	m     sync.Map
 	count int
-}
-
-func (us *users) addMessage(msg *Message) {
-	glog.V(1).Infoln("user(s) message " + msg.EventName)
-	us.m.Range(func(k interface{}, v interface{}) bool {
-		u := v.(*User)
-		if u == nil || u.IsDead() || u.Id == msg.CallerId {
-			return true
-		}
-
-		u.addMessage(msg)
-		return true
-	})
 }
 
 func (us *users) addUser(u *User) {
