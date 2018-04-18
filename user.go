@@ -34,10 +34,6 @@ type User struct {
 }
 
 func (u *User) IsDead() bool {
-	if u.clientsCount >= 2 {
-		return false
-	}
-
 	return !u.anyActiveClient()
 }
 
@@ -107,9 +103,9 @@ func (u *User) AddClt(clt *Client) {
 	u.clients.Store(clt.Id, clt)
 }
 
-func (u *User) DelClt(clt *Client) {
+func (u *User) DelClt(clientId string) {
 	u.clientsCount -= 1
-	u.clients.Delete(clt.Id)
+	u.clients.Delete(clientId)
 }
 
 func (u *User) AddRoom(room *Room) {
@@ -121,9 +117,9 @@ func (u *User) AddRoom(room *Room) {
 	u.rooms.Store(room.Id, room)
 }
 
-func (u *User) DelRoom(room *Room) {
+func (u *User) DelRoom(roomId string) {
 	u.roomsCount -= 1
-	u.rooms.Delete(room.Id)
+	u.rooms.Delete(roomId)
 }
 
 func (u *User) Rooms() map[string]*Room {

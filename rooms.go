@@ -17,9 +17,9 @@ func (r *rooms) AddRoom(room *Room) {
 	r.m.Store(room.Id, room)
 }
 
-func (r *rooms) DelRoom(room *Room) {
+func (r *rooms) DelRoom(roomId string) {
 	r.count -= 1
-	r.m.Delete(room.Id)
+	r.m.Delete(roomId)
 }
 
 func (r *rooms) Count() int {

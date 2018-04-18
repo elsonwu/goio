@@ -38,9 +38,9 @@ func (c *clients) AddClt(clt *Client) {
 	c.m.Store(clt.Id, clt)
 }
 
-func (c *clients) DelClt(clt *Client) {
+func (c *clients) DelClt(clientId string) {
 	c.count -= 1
-	c.m.Delete(clt.Id)
+	c.m.Delete(clientId)
 }
 
 func (c *clients) Get(clientId string) *Client {

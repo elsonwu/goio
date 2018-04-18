@@ -61,8 +61,8 @@ func SendMessage(msg *Message, caller interface{}) {
 					return
 				}
 
-				r.delUser(clt.User)
-				clt.User.DelRoom(r)
+				r.delUser(clt.User.Id)
+				clt.User.DelRoom(r.Id)
 
 				go r.addMessage(msg)
 			}

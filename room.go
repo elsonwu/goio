@@ -24,10 +24,6 @@ type Room struct {
 }
 
 func (r *Room) IsDead() bool {
-	if r.userCount >= 2 {
-		return false
-	}
-
 	return !r.anyActiveUser()
 }
 
@@ -75,9 +71,9 @@ func (r *Room) addUser(u *User) {
 	r.m.Store(u.Id, u)
 }
 
-func (r *Room) delUser(u *User) {
+func (r *Room) delUser(userId string) {
 	r.userCount -= 1
-	r.m.Delete(u.Id)
+	r.m.Delete(userId)
 }
 
 func (r *Room) UserIds() []string {

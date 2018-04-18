@@ -19,9 +19,9 @@ func (us *users) addUser(u *User) {
 	us.m.Store(u.Id, u)
 }
 
-func (us *users) delUser(u *User) {
+func (us *users) delUser(userId string) {
 	us.count -= 1
-	us.m.Delete(u.Id)
+	us.m.Delete(userId)
 }
 
 func (us *users) Count() int {

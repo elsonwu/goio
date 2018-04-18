@@ -30,16 +30,15 @@ func gc() {
 		}
 
 		glog.V(1).Infoln("clt " + clt.Id + " is dead")
-		Clients().DelClt(clt)
-		clt.User.DelClt(clt)
+		Clients().DelClt(clt.Id)
+		clt.User.DelClt(clt.Id)
 
 		return true
 	})
 
 	var deadUsrs []*User
-	var u *User
 	Users().m.Range(func(k interface{}, v interface{}) bool {
-		u = v.(*User)
+		u := v.(*User)
 		if u == nil || !u.IsDead() {
 			return true
 		}
@@ -47,9 +46,9 @@ func gc() {
 		deadUsrs = append(deadUsrs, u)
 
 		glog.V(1).Infoln("user " + u.Id + " is dead")
-		Users().delUser(u)
+		Users().delUser(u.Id)
 		for _, r := range u.Rooms() {
-			r.delUser(u)
+			r.delUser(u.Id)
 		}
 
 		return true
@@ -62,8 +61,8 @@ func gc() {
 			return true
 		}
 
-		glog.V(1).Infoln("room " + u.Id + " is dead")
-		Rooms().DelRoom(r)
+		glog.V(1).Infoln("room " + r.Id + " is dead")
+		Rooms().DelRoom(r.Id)
 		return true
 	})
 
