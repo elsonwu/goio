@@ -12,12 +12,16 @@ func NewClients() *clients {
 }
 
 type clients struct {
-	m     sync.Map
-	count int
+	m sync.Map
 }
 
 func (c *clients) Count() int {
-	return c.count
+	n := 0
+	c.Range(func(c *Client) {
+		n = n + 1
+	})
+
+	return n
 }
 
 func (c *clients) addMessage(msg *Message) {
@@ -34,12 +38,10 @@ func (c *clients) addMessage(msg *Message) {
 }
 
 func (c *clients) AddClt(clt *Client) {
-	c.count += 1
 	c.m.Store(clt.Id, clt)
 }
 
 func (c *clients) DelClt(clientId string) {
-	c.count -= 1
 	c.m.Delete(clientId)
 }
 

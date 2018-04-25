@@ -8,22 +8,24 @@ func NewRooms() *rooms {
 }
 
 type rooms struct {
-	m     sync.Map
-	count int
+	m sync.Map
 }
 
 func (r *rooms) AddRoom(room *Room) {
-	r.count += 1
 	r.m.Store(room.Id, room)
 }
 
 func (r *rooms) DelRoom(roomId string) {
-	r.count -= 1
 	r.m.Delete(roomId)
 }
 
 func (r *rooms) Count() int {
-	return r.count
+	n := 0
+	r.Range(func(r *Room) {
+		n = n + 1
+	})
+
+	return n
 }
 
 func (r *rooms) Range(f func(r *Room)) {

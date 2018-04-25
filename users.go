@@ -10,22 +10,24 @@ func NewUsers() *users {
 }
 
 type users struct {
-	m     sync.Map
-	count int
+	m sync.Map
 }
 
 func (us *users) addUser(u *User) {
-	us.count += 1
 	us.m.Store(u.Id, u)
 }
 
 func (us *users) delUser(userId string) {
-	us.count -= 1
 	us.m.Delete(userId)
 }
 
 func (us *users) Count() int {
-	return us.count
+	n := 0
+	us.Range(func(u *User) {
+		n = n + 1
+	})
+
+	return n
 }
 
 func (us *users) Get(userId string) *User {
